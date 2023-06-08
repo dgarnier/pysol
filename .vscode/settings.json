@@ -1,5 +1,7 @@
 {
-    "editor.tabCompletion": "on",
-    "diffEditor.codeLens": true,
-    "python.formatting.provider": "black"
+  "editor.tabCompletion": "on",
+  "diffEditor.codeLens": true,
+  "python.formatting.provider": "black",
+  "python.linting.flake8Enabled": true,
+  "python.linting.enabled": true
 }

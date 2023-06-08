@@ -2,8 +2,8 @@ import unittest
 
 from pysol.elliptics import ellipke
 
-class TestElliptics(unittest.TestCase):
 
+class TestElliptics(unittest.TestCase):
     def test_ellipke(self):
         scipy_data = [
             (0.00, 1.5707963267948966, 1.5707963267948966),
@@ -25,12 +25,14 @@ class TestElliptics(unittest.TestCase):
             (0.80, 2.257205326820854, 1.1784899243278386),
             (0.85, 2.38901648632558, 1.1433957918831659),
             (0.90, 2.5780921133481733, 1.1047747327040733),
-            (0.95, 2.9083372484445524, 1.0604737277662781)
+            (0.95, 2.9083372484445524, 1.0604737277662781),
         ]
-        for (m, k, e) in scipy_data:
-            self.assertAlmostEqual(ellipke(m)[0], k, places=14)  # this fails at the 15th place
+        for m, k, e in scipy_data:
+            self.assertAlmostEqual(
+                ellipke(m)[0], k, places=14
+            )  # this fails at the 15th place
             self.assertAlmostEqual(ellipke(m)[1], e, places=14)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
