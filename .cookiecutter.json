@@ -1,0 +1,14 @@
+{
+  "_output_dir": "/Volumes/Media/sb",
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "Darren Garnier",
+  "copyright_year": "2023",
+  "development_status": "Development Status :: 4 - Beta",
+  "email": "garnier@psfc.mit.edu",
+  "friendly_name": "PySol",
+  "github_user": "dgarnier",
+  "license": "MIT",
+  "package_name": "pysol",
+  "project_name": "pysol",
+  "version": "0.1.0"
+}
