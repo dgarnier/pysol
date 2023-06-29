@@ -27,6 +27,7 @@ class TestElliptics(unittest.TestCase):
             (0.90, 2.5780921133481733, 1.1047747327040733),
             (0.95, 2.9083372484445524, 1.0604737277662781),
         ]
+
         for m, k, e in scipy_data:
             self.assertAlmostEqual(
                 ellipke(m)[0], k, places=14

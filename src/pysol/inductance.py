@@ -61,6 +61,7 @@ from .elliptics import ellipke
 
 try:
     from mpmath import fp, mp
+
     USE_MPMATH = True
 except (ImportError, ModuleNotFoundError):
     USE_MPMATH = False
@@ -630,22 +631,26 @@ def vertical_force_fil(rzn1, rzn2):
     z2 = rzn2[1]
     n1 = rzn1[2]
     n2 = rzn2[2]
-    k2 = 4 * r1 * r2 / ((r1 + r2) ** 2 + (z1 - z2) ** 2)
-    elk, ele = ellipke(k2)
-    BrAt1 = (
-        (z2 - z1)
-        * (
-            (r2**2 + r1**2 + (z2 - z1) ** 2) * ele
-            - ((r2 - r1) ** 2 + (z2 - z1) ** 2) * elk
-        )
-    ) / (
-        5000000
-        * r1
-        * ((r2 - r1) ** 2 + (z2 - z1) ** 2)
-        * np.sqrt((r2 + r1) ** 2 + (z2 - z1) ** 2)
-    )
 
+    BrAt1 = BrGreen(r1, z1, r2, z2)
     F = n1 * n2 * 2 * np.pi * r1 * BrAt1
+    return F
+
+
+@njit
+def radial_force_fil(rzn1, rzn2):
+    # calculatate the radial force per conductor amp.
+    # of two filaments defined as r, z, and n.
+
+    r1 = rzn1[0]
+    r2 = rzn2[0]
+    z1 = rzn1[1]
+    z2 = rzn2[1]
+    n1 = rzn1[2]
+    n2 = rzn2[2]
+
+    BzAt1 = BzGreen(r1, z1, r2, z2)
+    F = n1 * n2 * 2 * np.pi * r1 * BzAt1
     return F
 
 
@@ -666,34 +671,24 @@ def AGreen(r, z, a, b):
 
 @njit
 def BrGreen(r, z, a, b):
+    # Br green's function of a filament with radius a, and z postion b,
+    # calculated at r,z
     k2 = 4 * a * r / ((r + a) ** 2 + (z - b) ** 2)
     elk, ele = ellipke(k2)
-    br = (
-        2e-7
-        * (b - z)
-        / r
-        / np.sqrt((a + r) ** 2 + (b - z) ** 2)
-        * (
-            ((a**2 + r**2 + (b - z) ** 2) / ((a - r) ** 2 + (z - b) ** 2)) * ele
-            - elk
-        )
-    )
-    return br
+    amp = -2e-7 / np.sqrt((r + a) ** 2 + (z - b) ** 2)
+    Gr = (a**2 + r**2 + (z - b) ** 2) / ((r - a) ** 2 + (z - b) ** 2)
+    return amp * (z - b) / r * (Gr * ele - elk)
 
 
 @njit
 def BzGreen(r, z, a, b):
+    # Bz green's function of a filament with radius a, and z postion b,
+    # calculated at r,z
     k2 = 4 * a * r / ((r + a) ** 2 + (z - b) ** 2)
     elk, ele = ellipke(k2)
-    bz = (
-        -2e-7
-        / np.sqrt((a + r) ** 2 + (b - z) ** 2)
-        * (
-            ((a**2 - r**2 - (b - z) ** 2) / ((a - r) ** 2 + (z - b) ** 2)) * ele
-            + elk
-        )
-    )
-    return bz
+    amp = -2e-7 / np.sqrt((r + a) ** 2 + (z - b) ** 2)
+    Gz = (a**2 - r**2 - (z - b) ** 2) / ((r - a) ** 2 + (z - b) ** 2)
+    return amp * (Gz * ele + elk)
 
 
 @njit(parallel=True)
@@ -855,7 +850,7 @@ def AGreenFil(fil, r, z, gr):
 
 
 # cant jit this... meshgrid not allowed
-def filament_coil(r, z, dr, dz, nt, nr, nz):
+def filament_coil(r, z, dr, dz, nt, nr, nz, rot=0):
     """Create an array of filaments, each with its own
         radius, height, and amperage.
 
@@ -866,13 +861,18 @@ def filament_coil(r, z, dr, dz, nt, nr, nz):
     nt : number of turns in coil
     nr : Number of radial slices
     nz : Number of vertical slices
+    rot : Rotation of coil about phi axis
 
     Returns:    Array of shape (nr*nz) x 3 of R, Z, N for each filament
 
     """
-    rs = np.linspace(r - dr * (nr - 1) / nr / 2, r + dr * (nr - 1) / nr / 2, nr)
-    zs = np.linspace(z - dz * (nz - 1) / nz / 2, z + dz * (nz - 1) / nz / 2, nz)
-    R, Z = np.meshgrid(rs, zs)
+    rd = np.linspace(-dr * (nr - 1) / nr / 2, dr * (nr - 1) / nr / 2, nr)
+    zd = np.linspace(-dz * (nz - 1) / nz / 2, dz * (nz - 1) / nz / 2, nz)
+    Rg, Zg = np.meshgrid(rd, zd)
+
+    R = r + Rg * np.cos(rot) - Zg * np.sin(rot)
+    Z = z + Rg * np.sin(rot) + Zg * np.cos(rot)
+
     N = np.full_like(R, float(nt) / (nr * nz))
     return np.dstack([R, Z, N]).reshape(nr * nz, 3)
 
@@ -896,12 +896,24 @@ def mutual_inductance_of_filaments(f1, f2):
 
 
 @njit(parallel=True)
+def self_inductance_by_filaments(f, conductor="round", rc=0, hc=0, wc=0):
+    L = float(0)
+    for i in prange(f.shape[0]):
+        for j in range(f.shape[0]):
+            if i != j:
+                L += mutual_inductance_fil(f[i, :], f[j, :])
+        L += self_inductance_fil(f[i, :], conductor)
+    return L
+
+
+@njit(parallel=True)
 def vertical_force_of_filaments(f1, f2):
     F = float(0)
     for i in prange(f1.shape[0]):
         for j in range(f2.shape[0]):
             F += vertical_force_fil(f1[i, :], f2[j, :])
     return F
+
 
 @njit(parallel=True)
 def radial_force_of_filaments(f1, f2):
@@ -910,7 +922,6 @@ def radial_force_of_filaments(f1, f2):
         for j in range(f2.shape[0]):
             F += radial_force_fil(f1[i, :], f2[j, :])
     return F
-
 
 
 # This is a dictionary based API, making it easier to define coils.

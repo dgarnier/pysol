@@ -9,3 +9,4 @@
 /src/*.egg-info/
 __pycache__/
 src/pysol/_version.py
+tests/test_new_dipole.py

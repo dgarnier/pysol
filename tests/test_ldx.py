@@ -1,4 +1,7 @@
-from pysol.inductance import *
+import numpy as np
+
+from pysol.inductance import (FilamentCoil, LLyle4, LLyle6, LLyle6A, LMaxwell,
+                              TotalFz, TotalM0)
 
 
 def run_ldx_tests():

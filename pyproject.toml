@@ -1,6 +1,7 @@
 [tool.poetry]
 name = "pysol"
-version = "0.1.0"
+# version set in git tag
+version = "0.0.0"
 description = "Code for 2D magnetostatics (aka Solenoids)"
 authors = ["Darren Garnier <garnier@mit.edu>"]
 license = "MIT"
@@ -13,22 +14,24 @@ click = "^8.0"
 
 [tool.poetry.dev-dependencies]
 poetry = "^1.4.0"
-matplotlib = "^3.7.1"
-jupyter-hdfscontents = "^0.2"
-versioningit = "^2.2.0"
-nox = "^2023.4.22"
-nox-poetry = "^0.8.0"
+# nox = "^2023.4.22"
+nox-poetry = "^1.0.0"
+dunamai = "^1.17.0"
 
-[tool.versioningit.vcs]
-# The method key:
-method = "git"  # <- The method name
-# Parameters to pass to the method:
-match = ["v*"]
-default-tag = "0.1.0"
+[tool.poetry-dynamic-versioning]
+enable = true
+metadata = true
 
-[tool.versioningit.write]
-file = "src/pysol/_version.py"
+[tool.poetry-dynamic-versioning.substitution]
+folders = [
+  { path = "src" }
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.black]
+extend-exclude = '''
+( src/elliptics.py )
+'''
