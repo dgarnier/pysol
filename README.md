@@ -19,6 +19,8 @@
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [black]: https://github.com/psf/black
 
+This is a python library to calculate inductance. Mostly for the purposes of calcualting magnetically confined plasmas. It might someday actually contain some plasma physics, but lets not get too carried away.
+
 ## Features
 
 - TODO

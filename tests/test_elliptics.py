@@ -1,6 +1,7 @@
 """Test the elliptics module."""
 
 import unittest
+
 from inductance.elliptics import ellipke
 
 

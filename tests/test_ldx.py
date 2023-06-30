@@ -1,7 +1,9 @@
 """Test filamentation and inducatance of LDX coils."""
 
 import unittest
+
 import numpy as np
+
 from inductance.filaments import (
     FilamentCoil,
     Lfil,
