@@ -14,7 +14,6 @@ hidden:
 maxdepth: 2
 ---
 
-usage
 reference
 contributing
 Code of Conduct <codeofconduct>
