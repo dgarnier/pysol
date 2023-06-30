@@ -35,3 +35,5 @@ build-backend = "poetry_dynamic_versioning.backend"
 extend-exclude = '''
 ( src/elliptics.py )
 '''
+[tool.isort]
+profile = "black"

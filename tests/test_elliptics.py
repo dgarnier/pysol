@@ -1,10 +1,15 @@
+"""Test the elliptics module."""
+
 import unittest
 
 from pysol.elliptics import ellipke
 
 
 class TestElliptics(unittest.TestCase):
+    """Test the elliptics module."""
+
     def test_ellipke(self):
+        """Test the ellipke function."""
         scipy_data = [
             (0.00, 1.5707963267948966, 1.5707963267948966),
             (0.05, 1.591003453790792, 1.5509733517804725),
