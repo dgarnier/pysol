@@ -15,7 +15,7 @@ from math import log
 
 # use numba if its installed
 try:
-    from numba import jit_module, vectorize
+    from numba import jit_module
 
 except ImportError:
     from warnings import warn_explicit
