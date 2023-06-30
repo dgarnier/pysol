@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "inductance"
 # version set in git tag
-version = "0.0.0"
+version = "0.1.0a1.post4.dev0+6b6695f.dev.1688154083"
 description = "Code for 2D inductance calculations"
 authors = ["Darren Garnier <garnier@mit.edu>"]
 license = "MIT"

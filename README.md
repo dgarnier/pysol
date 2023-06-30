@@ -37,9 +37,9 @@ You can install _inductance_ via [pip] from [PyPI]:
 $ pip install inductance
 ```
 
-## Usage
+## Reference
 
-Please see the [Command-line Reference] for details.
+Please see the [Reference] for details.
 
 ## Contributing
 
@@ -70,4 +70,4 @@ This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter]
 
 [license]: https://github.com/dgarnier/inductance/blob/main/LICENSE
 [contributor guide]: https://github.com/dgarnier/inductance/blob/main/CONTRIBUTING.md
-[command-line reference]: https://inductance.readthedocs.io/en/latest/usage.html
+[reference]: https://inductance.readthedocs.io/en/latest/reference.html
