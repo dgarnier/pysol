@@ -39,7 +39,7 @@ $ pip install inductance
 
 ## Reference
 
-Please see the [Reference] for details.
+Please see the [reference] for details.
 
 ## Contributing
 
