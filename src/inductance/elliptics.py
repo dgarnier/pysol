@@ -1,16 +1,21 @@
-# Follow Toshio Fukushima, "Precise and fast computation of a general incomplete
-# elliptic integral of second kind by half and double argument transformations"
-# Journal of Computational and Applied Mathematics 235 (2011) 4140–4148
-# DOI: https://doi.org/10.1090/S0025-5718-2011-02455-5
-#
-# with numba, this runs ~10x faster than scipy.special if you need both k and e
-# so.. don't need numba_scipy which lags numba and scipy often
+"""Precise and fast elliptic integrals.
+
+Author: Fukushima, T. <Toshio.Fukushima@nao.ac.jp>
+
+Reference: Toshio Fukushima, "Precise and fast computation of a general incomplete
+elliptic integral of second kind by half and double argument transformations"
+Journal of Computational and Applied Mathematics 235 (2011) 4140–4148
+DOI: https://doi.org/10.1090/S0025-5718-2011-02455-5
+
+With Numba, this runs ~10x faster than scipy.special if you need both k and e
+so.. don't need numba_scipy which lags numba and scipy often.
+"""
 
 from math import log
 
 # use numba if its installed
 try:
-    from numba import jit_module, vectorize
+    from numba import jit_module
 
 except ImportError:
     from warnings import warn_explicit
@@ -21,20 +26,14 @@ except ImportError:
 
 # fmt: off
 def celbd(mc):
-    '''
-    !---------------------------------------------------------------------------
-    subroutine celbd(mc,elb,eld)
-    !
-    ! Simultaneous computation of associate complete elliptic integrals
-    ! of second kind, B(m) and D(m)
-    !
-    ! Reference: Fukushima, T (2011) Math. Comp., 80, 1725-1743
-    !   Precise and fast computation of general complete elliptic integral
-    !   of second kind
-    !
-    ! Author: Fukushima, T. <Toshio.Fukushima@nao.ac.jp>
-    !
-    '''
+    """Complete elliptic integrals of second kind, B(m) and D(m).
+
+    Args:
+        mc (float): mc = 1-k^2, where k is the elliptic modulus.
+
+    Returns:
+        (B(m), D(m)), the associate complete elliptic integrals of second kind
+    """
     PIQ = 0.78539816339744830961566084581988
     PIHALF = 1.5707963267948966192313216916398
 
@@ -506,18 +505,41 @@ def celbd(mc):
 
 
 def ellipke(k2):
-    # return both the first and second legendre complete eliptic integrals
+    """Complete elliptic integrals of first and second kind.
+
+    Args:
+        k2 (float): K^2 the square of the elliptic modulus.
+
+    Returns:
+        (float, float): Elliptic integrals K(k^2) and E(k^2).
+    """
     mc = 1.0 - k2
     elb, eld = celbd(mc)
     return (elb + eld, elb + mc * eld)
 
 
 def ellipk(k2):
+    """Complete elliptic integral of the first kind.
+
+    Args:
+        k2 (float): K^2 the square of the elliptic modulus.
+
+    Returns:
+        (float): Elliptic integral K(k^2).
+    """
     k, _e = ellipke(k2)
     return k
 
 
 def ellipe(k2):
+    """Complete elliptic integral of the second kind.
+
+    Args:
+        k2 (float): K^2 the square of the elliptic modulus.
+
+    Returns:
+        (float): Elliptic integral E(k^2).
+    """
     _k, e = ellipke(k2)
     return e
 
