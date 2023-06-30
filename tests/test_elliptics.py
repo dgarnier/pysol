@@ -1,8 +1,7 @@
 """Test the elliptics module."""
 
 import unittest
-
-from pysol.elliptics import ellipke
+from inductance.elliptics import ellipke
 
 
 class TestElliptics(unittest.TestCase):

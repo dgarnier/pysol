@@ -19,5 +19,5 @@ reference
 contributing
 Code of Conduct <codeofconduct>
 License <license>
-Changelog <https://github.com/dgarnier/pysol/releases>
+Changelog <https://github.com/dgarnier/inductance/releases>
 ```

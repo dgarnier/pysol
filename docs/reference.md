@@ -1,8 +1,8 @@
 # Reference
 
-## pysol
+## inductance
 
 ```{eval-rst}
-.. automodule:: pysol
+.. automodule:: inductance
    :members:
 ```

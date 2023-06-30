@@ -1,21 +1,21 @@
-# PySol
+# Inductance
 
-[![PyPI](https://img.shields.io/pypi/v/pysol.svg)][pypi status]
-[![Status](https://img.shields.io/pypi/status/pysol.svg)][pypi status]
-[![Python Version](https://img.shields.io/pypi/pyversions/pysol)][pypi status]
-[![License](https://img.shields.io/pypi/l/pysol)][license]
+[![PyPI](https://img.shields.io/pypi/v/inductance.svg)][pypi status]
+[![Status](https://img.shields.io/pypi/status/inductance.svg)][pypi status]
+[![Python Version](https://img.shields.io/pypi/pyversions/inductance)][pypi status]
+[![License](https://img.shields.io/pypi/l/inductance)][license]
 
-[![Read the documentation at https://pysol.readthedocs.io/](https://img.shields.io/readthedocs/pysol/latest.svg?label=Read%20the%20Docs)][read the docs]
-[![Tests](https://github.com/dgarnier/pysol/workflows/Tests/badge.svg)][tests]
-[![Codecov](https://codecov.io/gh/dgarnier/pysol/branch/main/graph/badge.svg)][codecov]
+[![Read the documentation at https://inductance.readthedocs.io/](https://img.shields.io/readthedocs/inductance/latest.svg?label=Read%20the%20Docs)][read the docs]
+[![Tests](https://github.com/dgarnier/inductance/workflows/Tests/badge.svg)][tests]
+[![Codecov](https://codecov.io/gh/dgarnier/inductance/branch/main/graph/badge.svg)][codecov]
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
 
-[pypi status]: https://pypi.org/project/pysol/
-[read the docs]: https://pysol.readthedocs.io/
-[tests]: https://github.com/dgarnier/pysol/actions?workflow=Tests
-[codecov]: https://app.codecov.io/gh/dgarnier/pysol
+[pypi status]: https://pypi.org/project/inductance/
+[read the docs]: https://inductance.readthedocs.io/
+[tests]: https://github.com/dgarnier/inductance/actions?workflow=Tests
+[codecov]: https://app.codecov.io/gh/dgarnier/inductance
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [black]: https://github.com/psf/black
 
@@ -29,10 +29,10 @@
 
 ## Installation
 
-You can install _PySol_ via [pip] from [PyPI]:
+You can install _inductance_ via [pip] from [PyPI]:
 
 ```console
-$ pip install pysol
+$ pip install inductance
 ```
 
 ## Usage
@@ -47,7 +47,7 @@ To learn more, see the [Contributor Guide].
 ## License
 
 Distributed under the terms of the [MIT license][license],
-_PySol_ is free and open source software.
+_inductance_ is free and open source software.
 
 ## Issues
 
@@ -61,11 +61,11 @@ This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter]
 [@cjolowicz]: https://github.com/cjolowicz
 [pypi]: https://pypi.org/
 [hypermodern python cookiecutter]: https://github.com/cjolowicz/cookiecutter-hypermodern-python
-[file an issue]: https://github.com/dgarnier/pysol/issues
+[file an issue]: https://github.com/dgarnier/inductance/issues
 [pip]: https://pip.pypa.io/
 
 <!-- github-only -->
 
-[license]: https://github.com/dgarnier/pysol/blob/main/LICENSE
-[contributor guide]: https://github.com/dgarnier/pysol/blob/main/CONTRIBUTING.md
-[command-line reference]: https://pysol.readthedocs.io/en/latest/usage.html
+[license]: https://github.com/dgarnier/inductance/blob/main/LICENSE
+[contributor guide]: https://github.com/dgarnier/inductance/blob/main/CONTRIBUTING.md
+[command-line reference]: https://inductance.readthedocs.io/en/latest/usage.html

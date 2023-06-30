@@ -6,4 +6,4 @@ max-complexity = 10
 docstring-convention = google
 rst-roles = class,const,func,meth,mod,ref
 rst-directives = deprecated
-exclude = src/pysol/elliptics.py
+exclude = src/inductance/elliptics.py

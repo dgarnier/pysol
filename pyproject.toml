@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pysol"
+name = "inductance"
 # version set in git tag
 version = "0.0.0"
 description = "Code for 2D magnetostatics (aka Solenoids)"

@@ -8,5 +8,5 @@
 /docs/_build/
 /src/*.egg-info/
 __pycache__/
-src/pysol/_version.py
+src/inductance/_version.py
 tests/test_new_dipole.py

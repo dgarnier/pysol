@@ -1,1 +1,1 @@
-"""Test suite for the pysol package."""
+"""Test suite for the inductance package."""

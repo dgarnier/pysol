@@ -1,8 +1,7 @@
 """Test cases for the __main__ module."""
 import pytest
 from click.testing import CliRunner
-
-from pysol import __main__
+from inductance import __main__
 
 
 @pytest.fixture

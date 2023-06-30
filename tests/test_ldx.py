@@ -1,10 +1,8 @@
 """Test filamentation and inducatance of LDX coils."""
 
 import unittest
-
 import numpy as np
-
-from pysol.filaments import (
+from inductance.filaments import (
     FilamentCoil,
     Lfil,
     LLyle4,

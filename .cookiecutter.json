@@ -5,10 +5,10 @@
   "copyright_year": "2023",
   "development_status": "Development Status :: 4 - Beta",
   "email": "garnier@psfc.mit.edu",
-  "friendly_name": "PySol",
+  "friendly_name": "Inductance",
   "github_user": "dgarnier",
   "license": "MIT",
-  "package_name": "pysol",
-  "project_name": "pysol",
+  "package_name": "inductance",
+  "project_name": "inductance",
   "version": "0.1.0"
 }
