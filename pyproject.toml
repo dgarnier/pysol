@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "inductance"
 # version set in git tag
-version = "0.1.0a1.post4.dev0+6b6695f.dev.1688154083"
+version = "0.0.0"
 description = "Code for 2D inductance calculations"
 authors = ["Darren Garnier <garnier@mit.edu>"]
 license = "MIT"
@@ -14,8 +14,8 @@ numpy = "^1.24"
 numba = "^0.57"
 
 [tool.poetry.dev-dependencies]
-poetry = "^1.4.0"
-# nox = "^2023.4.22"
+poetry = "^1.5.1"
+nox = "^2023.4.22"
 nox-poetry = "^1.0.0"
 dunamai = "^1.17.0"
 
@@ -29,7 +29,7 @@ folders = [
 ]
 
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
+requires = ["poetry-core>=1.6.0", "poetry-dynamic-versioning"]
 build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.black]
