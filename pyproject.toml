@@ -45,4 +45,12 @@ profile = "black"
 mypy_path = "stubs"
 
 [tool.coverage.paths]
-source = ["tests", "src/inductance"]
+source = ["src", "*/site-packages"]
+tests = ["tests", "*/tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["inductance"]
+
+[tool.coverage.report]
+show_missing = true
