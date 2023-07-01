@@ -60,7 +60,7 @@ except ImportError:
 from .elliptics import ellipke
 
 try:
-    from mpmath import mp
+    from mpmath import mp  # type: ignore
 
     USE_MPMATH = True
 except ImportError:
