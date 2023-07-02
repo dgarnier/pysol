@@ -19,6 +19,7 @@ to greatly increase speed. Also requires numba-scipy for elliptical functions.
 numba-scipy can be fragile and sometimes needs to be "updated" before installation
 to the newest version of numba.
 """
+import os
 
 import numpy as np
 
@@ -26,14 +27,23 @@ import numpy as np
 try:
     from numba import guvectorize, jit, njit, prange
 
-except ImportError:
+    if os.getenv("NUMBA_DISABLE_JIT", "0") == "1":  # pragma: no cover
+        raise ImportError
+
+except ImportError:  # pragma: no cover
+    from inspect import currentframe, getframeinfo
     from warnings import warn_explicit
 
-    warning = (
-        "Couldn't import Numba. Mutual inductance calculations "
+    WARNING = (
+        "Numba disabled. Mutual inductance calculations "
         + "will not be accelerated and some API will not be available."
     )
-    warn_explicit(warning, RuntimeWarning, "inductance.py", 0)
+    warn_explicit(
+        WARNING,
+        RuntimeWarning,
+        "inductance",
+        getframeinfo(currentframe().f_back).lineno,
+    )
 
     def _jit(*args, **kwargs):
         if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
@@ -46,7 +56,12 @@ except ImportError:
     def _guvectorize(*args, **kwds):
         def fake_decorator(f):
             warning = f"{f.__name__} requires Numba to be installed."
-            warn_explicit(warning, RuntimeWarning, "inductance.py", 0)
+            warn_explicit(
+                warning,
+                RuntimeWarning,
+                "inductance.py",
+                getframeinfo(currentframe().f_back.f_back).lineno,
+            )
             return lambda f: None
 
         return fake_decorator
@@ -63,7 +78,7 @@ try:
     from mpmath import mp  # type: ignore
 
     USE_MPMATH = True
-except ImportError:
+except ImportError:  # pragma: no cove
     USE_MPMATH = False
 
 
@@ -83,7 +98,7 @@ def _lyle_terms(b, c):
     return d, u, v, w, wp, phi, GMD
 
 
-if USE_MPMATH:
+if USE_MPMATH:  # pragma: no cover
 
     def _lyle_terms_mp(b, c):
         # b : cylindrical height of coil

@@ -2,6 +2,7 @@
 
 import unittest
 
+import coverage_env  # noqa: F401
 import numpy as np
 
 from inductance.filaments import (

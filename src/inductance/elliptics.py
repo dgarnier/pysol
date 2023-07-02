@@ -15,16 +15,16 @@ from math import log
 
 # use numba if its installed
 try:
-    from numba import jit_module
+    from numba import njit
 
-except ImportError:
-    from warnings import warn_explicit
+except ImportError:  # pragma: no cover
+    from warnings import warn
 
-    warning = "Couldn't import Numba. Elliptic integrals will run slower than expected."
-    warn_explicit(warning, RuntimeWarning, "elliptics.py", 0)
-
+    WARNING = "Couldn't import Numba. Elliptic integrals will run slower than expected."
+    warn(WARNING, RuntimeWarning)
 
 # fmt: off
+@njit("Tuple((float64, float64))(float64)")
 def celbd(mc):
     """Complete elliptic integrals of second kind, B(m) and D(m).
 
@@ -504,7 +504,8 @@ def celbd(mc):
 # fmt: on
 
 
-def ellipke(k2):
+@njit(["Tuple((f8, f8))(f8)"])
+def ellipke(k2: float) -> tuple[float, float]:
     """Complete elliptic integrals of first and second kind.
 
     Args:
@@ -513,12 +514,13 @@ def ellipke(k2):
     Returns:
         (float, float): Elliptic integrals K(k^2) and E(k^2).
     """
-    mc = 1.0 - k2
+    mc = 1.0e0 - k2
     elb, eld = celbd(mc)
     return (elb + eld, elb + mc * eld)
 
 
-def ellipk(k2):
+@njit(["f8(f8)"])
+def ellipk(k2: float) -> float:
     """Complete elliptic integral of the first kind.
 
     Args:
@@ -531,7 +533,8 @@ def ellipk(k2):
     return k
 
 
-def ellipe(k2):
+@njit(["f8(f8)"])
+def ellipe(k2: float) -> float:
     """Complete elliptic integral of the second kind.
 
     Args:
@@ -544,4 +547,4 @@ def ellipe(k2):
     return e
 
 
-jit_module(nopython=True, fastmath=True, error_model="numpy")
+# jit_module(nopython=True, fastmath=True, error_model="numpy")
