@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover
     warn(WARNING, RuntimeWarning)
 
 # fmt: off
-@njit("Tuple((float64, float64))(float64)")
+@njit("UniTuple(float64, 2)(float64)")
 def celbd(mc):
     """Complete elliptic integrals of second kind, B(m) and D(m).
 
@@ -505,9 +505,8 @@ def celbd(mc):
 # fmt: on
 
 
-# @njit(["Tuple((f8, f8))(f8)"])
-@njit
-def ellipke(k2: float) -> Tuple[float, float]:
+@njit("UniTuple(f8, 2)(f8)")
+def ellipke(k2):
     """Complete elliptic integrals of first and second kind.
 
     Args:
@@ -522,7 +521,7 @@ def ellipke(k2: float) -> Tuple[float, float]:
 
 
 @njit(["f8(f8)"])
-def ellipk(k2: float) -> float:
+def ellipk(k2):
     """Complete elliptic integral of the first kind.
 
     Args:
@@ -536,7 +535,7 @@ def ellipk(k2: float) -> float:
 
 
 @njit(["f8(f8)"])
-def ellipe(k2: float) -> float:
+def ellipe(k2):
     """Complete elliptic integral of the second kind.
 
     Args:

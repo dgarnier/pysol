@@ -366,7 +366,7 @@ def L_lyle6(r, dr, dz, n):
         )
         / 1.73408256e10  # 6th order
     )
-    L = 4e-7 * np.pi * (n**2) * a * f
+    L = MU0 * (n**2) * a * f
     # print("Lyle6 r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.8g"%(a,c,b,n,L))
     return L
 
@@ -560,12 +560,12 @@ if USE_MPMATH:
 
 
 @njit
-def L_long_solenoid(r, dr, dz, n):
+def L_long_solenoid(r, _dr, dz, n):
     """Self inductance of a long solenoid.
 
     Args:
         r (float): coil centerline radius
-        dr (float): coil radial width (ignored)
+        _dr (float): coil radial width (ignored)
         dz (float): coil height
         n (int): number of turns
 
@@ -575,13 +575,16 @@ def L_long_solenoid(r, dr, dz, n):
     a = float(r)
     b = float(dz)
     # c = float(dr)
-    L = 4e-7 * np.pi * (n**2) * a / b
-    return L
+    L1 = MU0 * np.pi * (n**2) * a**2 / b
+    return L1
 
 
 @njit
 def L_long_solenoid_butterworth(r, dr, dz, n):
     """Self inductance of a long solenoid by Butterworth's formula.
+
+    As written in Grover, Bulletin of the Bureau of Standards, Vol. 14 pg. 558
+    https://nvlpubs.nist.gov/nistpubs/bulletin/14/nbsbulletinv14n4p537_A2b.pdf
 
     Args:
         r (float): coil centerline radius
@@ -646,12 +649,17 @@ def L_long_solenoid_butterworth(r, dr, dz, n):
 
 
 @njit
-def L_thin_wall_babic_akyel(r, dr, dz, n):
+def L_thin_wall_babic_akyel(r, _dr, dz, n):
     """Self inductance thin wall solenoid by Babic and Akyel's formula.
+
+    Follow formulae from:
+    S. Babic and C. Akyel, "Improvement in calculation of the self- and mutual inductance
+    of thin-wall solenoids and disk coils," in IEEE Transactions on Magnetics,
+    vol. 36, no. 4, pp. 1970-1975, July 2000, doi: 10.1109/TMAG.2000.875240.
 
     Args:
         r (float): coil centerline radius
-        dr (float): coil radial width
+        _dr (float): coil radial width (ignored)
         dz (float): coil height
         n (int): number of turns
 
@@ -673,8 +681,8 @@ def L_thin_wall_babic_akyel(r, dr, dz, n):
         / (3 * np.pi * beta * k**3)
         * ((2 * k2 - 1) * ele + (1 - k2) * elk - k**3)
     )
-    L = 4e-7 * np.pi * np.pi * (n**2) * r / (2 * beta) * tk
-    return L
+    eq8 = MU0 * np.pi * (n**2) * r / (2 * beta) * tk  # eq 8
+    return eq8
 
 
 @njit
@@ -683,21 +691,19 @@ def L_thin_wall_lorentz(r, _dr, dz, n):
 
     Args:
         r (float): coil centerline radius
-        dr (float): coil radial width
+        _dr (float): coil radial width (ignored)
         dz (float): coil height
         n (int): number of turns
 
     Returns:
         float: coil self inductance in Henrys
     """
-    # a = float(dz) / 2
-    # beta = a / r
-
     k2 = 4 * r**2 / (4 * r**2 + dz**2)
     elk, ele = ellipke(k2)
     k = math.sqrt(k2)
     f = dz / (k * r) * elk - (dz**2 - 4 * r**2) / (k * r * dz) * ele - 4 * r / dz
-    L = 2 * (4e-7 * np.pi) * (n**2) * r**2 / (3 * dz) * f
+
+    L = MU0 * 2 * (n**2) * r**2 / (3 * dz) * f
     return L
 
 
@@ -706,30 +712,6 @@ def L_thin_wall_lorentz(r, _dr, dz, n):
 #  the more you filament, the better your accuracy
 #  the filamentation should match your current density
 #  and watch out for putting two filaments on top of eachother!
-
-# first, grab scipy's special elliptical integral functions E & K
-
-# turns out.. this isn't the way to make numba understand
-# scipy.. instead just install numba_scipy and it happens
-# automagically.
-
-# import scipy.special as sc
-
-# @jit('float64(float64)',nopython=True)
-# @njit
-# def ellipe(k):
-#    return sc.ellipe(k)
-
-# @jit('float64(float64)',nopython=True)
-# @njit
-# def ellipk(k):
-#    return sc.ellipk(k)
-
-# for this to work.. numba_scipy must be installed
-# and possibly has to be fixed..
-# I should add a test to check for missing and or broken numba_scipy
-
-# from scipy.special import ellipe, ellipk
 
 
 @njit

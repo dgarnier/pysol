@@ -15,6 +15,7 @@ numba = "^0.57"
 
 [tool.poetry.group.dev.dependencies]
 poetry = "^1.5.1"
+poetry_dynamic_versioning = "^0.24.0"
 nox = "^2023.4.22"
 nox-poetry = "^1.0.0"
 dunamai = "^1.17.0"
