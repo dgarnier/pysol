@@ -12,6 +12,7 @@ so.. don't need numba_scipy which lags numba and scipy often.
 """
 
 from math import log
+from typing import Tuple
 
 # use numba if its installed
 try:
@@ -504,8 +505,9 @@ def celbd(mc):
 # fmt: on
 
 
-@njit(["Tuple((f8, f8))(f8)"])
-def ellipke(k2: float) -> tuple[float, float]:
+# @njit(["Tuple((f8, f8))(f8)"])
+@njit
+def ellipke(k2: float) -> Tuple[float, float]:
     """Complete elliptic integrals of first and second kind.
 
     Args:

@@ -19,6 +19,7 @@ to greatly increase speed. Also requires numba-scipy for elliptical functions.
 numba-scipy can be fragile and sometimes needs to be "updated" before installation
 to the newest version of numba.
 """
+import math
 import os
 
 import numpy as np
@@ -41,8 +42,8 @@ except ImportError:  # pragma: no cover
     warn_explicit(
         WARNING,
         RuntimeWarning,
-        "inductance",
-        getframeinfo(currentframe().f_back).lineno,
+        "inductance.py",
+        getframeinfo(currentframe().f_back).lineno,  # type: ignore
     )
 
     def _jit(*args, **kwargs):
@@ -55,12 +56,12 @@ except ImportError:  # pragma: no cover
 
     def _guvectorize(*args, **kwds):
         def fake_decorator(f):
-            warning = f"{f.__name__} requires Numba to be installed."
+            warning = f"{f.__name__} requires Numba JIT."
             warn_explicit(
                 warning,
                 RuntimeWarning,
                 "inductance.py",
-                getframeinfo(currentframe().f_back.f_back).lineno,
+                getframeinfo(currentframe().f_back.f_back).lineno,  # type: ignore
             )
             return lambda f: None
 
@@ -81,12 +82,19 @@ try:
 except ImportError:  # pragma: no cove
     USE_MPMATH = False
 
+MU0 = 4e-7 * math.pi  # permeability of free space
+
 
 @njit
 def _lyle_terms(b, c):
     #  helper functions for most self inductance equations.
     # b : cylindrical height of coil
     # c : radial width of coil
+
+    # FIXME:  when b/c or c/b is very large or small, this diverges
+    #         and gives inaccurate results when b/c ~ 1e6 or 1e-6
+    # phi should approach 1.5 and GMD should approach (b+c)*exp(-1.5)
+
     d = np.sqrt(b**2 + c**2)  # diagnonal length
     u = ((b / c) ** 2) * 2 * np.log(d / b)
     v = ((c / b) ** 2) * 2 * np.log(d / c)
@@ -103,6 +111,9 @@ if USE_MPMATH:  # pragma: no cover
     def _lyle_terms_mp(b, c):
         # b : cylindrical height of coil
         # c : radial width of coil
+
+        # this does NOT fix problem with b/c ~ 1e6 or 1e-6
+
         d = mp.sqrt(b**2 + c**2)  # diagnonal length
         u = ((b / c) ** 2) * 2 * mp.log(d / b)
         v = ((c / b) ** 2) * 2 * mp.log(d / c)
@@ -130,7 +141,7 @@ def L_maxwell(r, dr, dz, n):
     b = float(dz)
     c = float(dr)
     d, u, v, w, wp, phi, GMD = _lyle_terms(b, c)
-    L = 4e-7 * np.pi * (n**2) * a * (np.log(8 * a / GMD) - 2)
+    L = MU0 * (n**2) * a * (math.log(8 * a / GMD) - 2)
     return L
 
 
@@ -146,7 +157,7 @@ def L_round(r, a, n):
     Returns:
         float: coil self inductance in Henrys
     """
-    L = 4e-7 * np.pi * (n**2) * r * (np.log(8 * r / a) - 1.75)
+    L = MU0 * (n**2) * r * (math.log(8 * r / a) - 1.75)
     return L
 
 
@@ -162,7 +173,7 @@ def L_hollow_round(r, a, n):
     Returns:
         float: coil self inductance in Henrys
     """
-    L = 4e-7 * np.pi * (n**2) * r * (np.log(8 * r / a) - 2)
+    L = MU0 * (n**2) * r * (math.log(8 * r / a) - 2)
     return L
 
 
@@ -219,20 +230,20 @@ def L_lyle4_eq3(r, dr, dz, n):
 
     # equation #3
 
-    L3 = (
-        4e-7
-        * np.pi
+    eq3 = (
+        MU0
         * (n**2)
         * a
         * (ML - 2 + (d / a) ** 2 * (p2 * ML + q2) + (d / a) ** 4 * (p4 * ML + q4))
     )
-
-    # print("Lyle43 r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.6g"%(a,c,b,n,L3))
-    return L3
+    return eq3
 
 
 # equation 4.. slightly different result... not sure which is better.
 # equation 3 above matches what I did for the 6th order.
+# and it also seems to match the 4th order in the paper.
+
+
 @njit
 def L_lyle4_eq4(r, dr, dz, n):
     """Self inductance of a rectangular coil via Lyle to 4th order, Eq4.
@@ -291,10 +302,8 @@ def L_lyle4_eq4(r, dr, dz, n):
     A = a * (1 + m1 * (d / a) ** 2 + m2 * (d / a) ** 4)
     R = GMD * (1 + n1 * (d / a) ** 2 + n2 * (d / a) ** 4 + n3 * (d / a) ** 6)
 
-    L4 = 4e-7 * np.pi * (n**2) * A * (np.log(8 * A / R) - 2)
-    # print((L4-L3)*1000)
-    # print("Lyle44 r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.6g"%(a,c,b,n,L4))
-    return L4
+    eq4 = MU0 * (n**2) * A * (np.log(8 * A / R) - 2)
+    return eq4
 
 
 L_lyle4 = L_lyle4_eq3
@@ -669,7 +678,7 @@ def L_thin_wall_babic_akyel(r, dr, dz, n):
 
 
 @njit
-def L_thin_wall_lorentz(r, dr, dz, n):
+def L_thin_wall_lorentz(r, _dr, dz, n):
     """Self inductance of a thin wall solenoid by Lorentz's formula.
 
     Args:
@@ -686,7 +695,7 @@ def L_thin_wall_lorentz(r, dr, dz, n):
 
     k2 = 4 * r**2 / (4 * r**2 + dz**2)
     elk, ele = ellipke(k2)
-    k = np.sqrt(k2)
+    k = math.sqrt(k2)
     f = dz / (k * r) * elk - (dz**2 - 4 * r**2) / (k * r * dz) * ele - 4 * r / dz
     L = 2 * (4e-7 * np.pi) * (n**2) * r**2 / (3 * dz) * f
     return L
