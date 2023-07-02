@@ -1,12 +1,16 @@
 [tool.poetry]
 name = "inductance"
-# version set in git tag
-version = "0.0.0"
+version = "v0.1.1a3"
 description = "Code for 2D inductance calculations"
-authors = ["Darren Garnier <garnier@mit.edu>"]
+authors = ["Darren Garnier <dgarnier@reinrag.net>"]
 license = "MIT"
 readme = "README.md"
+homepage = "https://github.com/dgarnier/inductance"
 repository = "https://github.com/dgarnier/inductance"
+documentation = "https://inductance.readthedocs.io"
+
+[tool.poetry.urls]
+Changelog = "https://github.com/dgarnier/inductance/releases"
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -14,26 +18,39 @@ numpy = "^1.24"
 numba = "^0.57"
 
 [tool.poetry.group.dev.dependencies]
+mpmath = "^1.0.0"
 poetry = "^1.5.1"
-poetry_dynamic_versioning = "^0.24.0"
-pre-commit = "^3.3.3"
 nox = "^2023.4.22"
 nox-poetry = "^1.0.0"
 dunamai = "^1.17.0"
-mpmath = "^1.0.0"
-
-[tool.poetry-dynamic-versioning]
-enable = true
-metadata = true
-
-[tool.poetry-dynamic-versioning.substitution]
-folders = [
-  { path = "src" }
-]
+Pygments = ">=2.10.0"
+black = ">=21.10b0"
+coverage = {extras = ["toml"], version = ">=6.2"}
+darglint = ">=1.8.1"
+flake8 = ">=4.0.1"
+flake8-bandit = ">=2.1.2"
+flake8-bugbear = ">=21.9.2"
+flake8-docstrings = ">=1.6.0"
+flake8-rst-docstrings = ">=0.2.5"
+furo = ">=2021.11.12"
+isort = ">=5.12.0"
+mypy = ">=0.930"
+pep8-naming = ">=0.12.1"
+pre-commit = "^3.3.3"
+pre-commit-hooks = ">=4.1.0"
+pytest = ">=6.2.5"
+pyupgrade = ">=2.29.1"
+safety = ">=1.10.3"
+sphinx = ">=4.3.2"
+sphinx-autobuild = ">=2021.3.14"
+sphinx-click = ">=3.0.2"
+typeguard = ">=2.13.3"
+xdoctest = {extras = ["colors"], version = ">=0.15.10"}
+myst-parser = {version = ">=0.16.1"}
 
 [build-system]
-requires = ["poetry-core>=1.6.0", "poetry-dynamic-versioning"]
-build-backend = "poetry_dynamic_versioning.backend"
+requires = ["poetry-core>=1.6.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 extend-exclude = '''
@@ -45,6 +62,10 @@ profile = "black"
 
 [tool.mypy]
 mypy_path = "stubs"
+pretty = true
+show_column_numbers = true
+show_error_codes = true
+show_error_context = true
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -52,7 +73,7 @@ tests = ["tests", "*/tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["inductance"]
+source = ["inductance", "tests"]
 
 [tool.coverage.report]
 show_missing = true
