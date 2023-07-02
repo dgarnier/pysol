@@ -19,6 +19,8 @@ to greatly increase speed. Also requires numba-scipy for elliptical functions.
 numba-scipy can be fragile and sometimes needs to be "updated" before installation
 to the newest version of numba.
 """
+import math
+import os
 
 import numpy as np
 
@@ -26,14 +28,23 @@ import numpy as np
 try:
     from numba import guvectorize, jit, njit, prange
 
-except ImportError:
+    if os.getenv("NUMBA_DISABLE_JIT", "0") == "1":  # pragma: no cover
+        raise ImportError
+
+except ImportError:  # pragma: no cover
+    from inspect import currentframe, getframeinfo
     from warnings import warn_explicit
 
-    warning = (
-        "Couldn't import Numba. Mutual inductance calculations "
+    WARNING = (
+        "Numba disabled. Mutual inductance calculations "
         + "will not be accelerated and some API will not be available."
     )
-    warn_explicit(warning, RuntimeWarning, "inductance.py", 0)
+    warn_explicit(
+        WARNING,
+        RuntimeWarning,
+        "inductance.py",
+        getframeinfo(currentframe().f_back).lineno,  # type: ignore
+    )
 
     def _jit(*args, **kwargs):
         if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
@@ -45,8 +56,13 @@ except ImportError:
 
     def _guvectorize(*args, **kwds):
         def fake_decorator(f):
-            warning = f"{f.__name__} requires Numba to be installed."
-            warn_explicit(warning, RuntimeWarning, "inductance.py", 0)
+            warning = f"{f.__name__} requires Numba JIT."
+            warn_explicit(
+                warning,
+                RuntimeWarning,
+                "inductance.py",
+                getframeinfo(currentframe().f_back.f_back).lineno,  # type: ignore
+            )
             return lambda f: None
 
         return fake_decorator
@@ -60,11 +76,13 @@ except ImportError:
 from .elliptics import ellipke
 
 try:
-    from mpmath import mp
+    from mpmath import mp  # type: ignore
 
     USE_MPMATH = True
-except ImportError:
+except ImportError:  # pragma: no cove
     USE_MPMATH = False
+
+MU0 = 4e-7 * math.pi  # permeability of free space
 
 
 @njit
@@ -72,6 +90,11 @@ def _lyle_terms(b, c):
     #  helper functions for most self inductance equations.
     # b : cylindrical height of coil
     # c : radial width of coil
+
+    # FIXME:  when b/c or c/b is very large or small, this diverges
+    #         and gives inaccurate results when b/c ~ 1e6 or 1e-6
+    # phi should approach 1.5 and GMD should approach (b+c)*exp(-1.5)
+
     d = np.sqrt(b**2 + c**2)  # diagnonal length
     u = ((b / c) ** 2) * 2 * np.log(d / b)
     v = ((c / b) ** 2) * 2 * np.log(d / c)
@@ -83,11 +106,14 @@ def _lyle_terms(b, c):
     return d, u, v, w, wp, phi, GMD
 
 
-if USE_MPMATH:
+if USE_MPMATH:  # pragma: no cover
 
     def _lyle_terms_mp(b, c):
         # b : cylindrical height of coil
         # c : radial width of coil
+
+        # this does NOT fix problem with b/c ~ 1e6 or 1e-6
+
         d = mp.sqrt(b**2 + c**2)  # diagnonal length
         u = ((b / c) ** 2) * 2 * mp.log(d / b)
         v = ((c / b) ** 2) * 2 * mp.log(d / c)
@@ -115,7 +141,7 @@ def L_maxwell(r, dr, dz, n):
     b = float(dz)
     c = float(dr)
     d, u, v, w, wp, phi, GMD = _lyle_terms(b, c)
-    L = 4e-7 * np.pi * (n**2) * a * (np.log(8 * a / GMD) - 2)
+    L = MU0 * (n**2) * a * (math.log(8 * a / GMD) - 2)
     return L
 
 
@@ -131,7 +157,7 @@ def L_round(r, a, n):
     Returns:
         float: coil self inductance in Henrys
     """
-    L = 4e-7 * np.pi * (n**2) * r * (np.log(8 * r / a) - 1.75)
+    L = MU0 * (n**2) * r * (math.log(8 * r / a) - 1.75)
     return L
 
 
@@ -147,7 +173,7 @@ def L_hollow_round(r, a, n):
     Returns:
         float: coil self inductance in Henrys
     """
-    L = 4e-7 * np.pi * (n**2) * r * (np.log(8 * r / a) - 2)
+    L = MU0 * (n**2) * r * (math.log(8 * r / a) - 2)
     return L
 
 
@@ -204,20 +230,20 @@ def L_lyle4_eq3(r, dr, dz, n):
 
     # equation #3
 
-    L3 = (
-        4e-7
-        * np.pi
+    eq3 = (
+        MU0
         * (n**2)
         * a
         * (ML - 2 + (d / a) ** 2 * (p2 * ML + q2) + (d / a) ** 4 * (p4 * ML + q4))
     )
-
-    # print("Lyle43 r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.6g"%(a,c,b,n,L3))
-    return L3
+    return eq3
 
 
 # equation 4.. slightly different result... not sure which is better.
 # equation 3 above matches what I did for the 6th order.
+# and it also seems to match the 4th order in the paper.
+
+
 @njit
 def L_lyle4_eq4(r, dr, dz, n):
     """Self inductance of a rectangular coil via Lyle to 4th order, Eq4.
@@ -276,10 +302,8 @@ def L_lyle4_eq4(r, dr, dz, n):
     A = a * (1 + m1 * (d / a) ** 2 + m2 * (d / a) ** 4)
     R = GMD * (1 + n1 * (d / a) ** 2 + n2 * (d / a) ** 4 + n3 * (d / a) ** 6)
 
-    L4 = 4e-7 * np.pi * (n**2) * A * (np.log(8 * A / R) - 2)
-    # print((L4-L3)*1000)
-    # print("Lyle44 r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.6g"%(a,c,b,n,L4))
-    return L4
+    eq4 = MU0 * (n**2) * A * (np.log(8 * A / R) - 2)
+    return eq4
 
 
 L_lyle4 = L_lyle4_eq3
@@ -342,7 +366,7 @@ def L_lyle6(r, dr, dz, n):
         )
         / 1.73408256e10  # 6th order
     )
-    L = 4e-7 * np.pi * (n**2) * a * f
+    L = MU0 * (n**2) * a * f
     # print("Lyle6 r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.8g"%(a,c,b,n,L))
     return L
 
@@ -536,12 +560,12 @@ if USE_MPMATH:
 
 
 @njit
-def L_long_solenoid(r, dr, dz, n):
+def L_long_solenoid(r, _dr, dz, n):
     """Self inductance of a long solenoid.
 
     Args:
         r (float): coil centerline radius
-        dr (float): coil radial width (ignored)
+        _dr (float): coil radial width (ignored)
         dz (float): coil height
         n (int): number of turns
 
@@ -551,13 +575,16 @@ def L_long_solenoid(r, dr, dz, n):
     a = float(r)
     b = float(dz)
     # c = float(dr)
-    L = 4e-7 * np.pi * (n**2) * a / b
-    return L
+    L1 = MU0 * np.pi * (n**2) * a**2 / b
+    return L1
 
 
 @njit
 def L_long_solenoid_butterworth(r, dr, dz, n):
     """Self inductance of a long solenoid by Butterworth's formula.
+
+    As written in Grover, Bulletin of the Bureau of Standards, Vol. 14 pg. 558
+    https://nvlpubs.nist.gov/nistpubs/bulletin/14/nbsbulletinv14n4p537_A2b.pdf
 
     Args:
         r (float): coil centerline radius
@@ -622,12 +649,17 @@ def L_long_solenoid_butterworth(r, dr, dz, n):
 
 
 @njit
-def L_thin_wall_babic_akyel(r, dr, dz, n):
+def L_thin_wall_babic_akyel(r, _dr, dz, n):
     """Self inductance thin wall solenoid by Babic and Akyel's formula.
+
+    Follow formulae from:
+    S. Babic and C. Akyel, "Improvement in calculation of the self- and mutual inductance
+    of thin-wall solenoids and disk coils," in IEEE Transactions on Magnetics,
+    vol. 36, no. 4, pp. 1970-1975, July 2000, doi: 10.1109/TMAG.2000.875240.
 
     Args:
         r (float): coil centerline radius
-        dr (float): coil radial width
+        _dr (float): coil radial width (ignored)
         dz (float): coil height
         n (int): number of turns
 
@@ -649,31 +681,29 @@ def L_thin_wall_babic_akyel(r, dr, dz, n):
         / (3 * np.pi * beta * k**3)
         * ((2 * k2 - 1) * ele + (1 - k2) * elk - k**3)
     )
-    L = 4e-7 * np.pi * np.pi * (n**2) * r / (2 * beta) * tk
-    return L
+    eq8 = MU0 * np.pi * (n**2) * r / (2 * beta) * tk  # eq 8
+    return eq8
 
 
 @njit
-def L_thin_wall_lorentz(r, dr, dz, n):
+def L_thin_wall_lorentz(r, _dr, dz, n):
     """Self inductance of a thin wall solenoid by Lorentz's formula.
 
     Args:
         r (float): coil centerline radius
-        dr (float): coil radial width
+        _dr (float): coil radial width (ignored)
         dz (float): coil height
         n (int): number of turns
 
     Returns:
         float: coil self inductance in Henrys
     """
-    # a = float(dz) / 2
-    # beta = a / r
-
     k2 = 4 * r**2 / (4 * r**2 + dz**2)
     elk, ele = ellipke(k2)
-    k = np.sqrt(k2)
+    k = math.sqrt(k2)
     f = dz / (k * r) * elk - (dz**2 - 4 * r**2) / (k * r * dz) * ele - 4 * r / dz
-    L = 2 * (4e-7 * np.pi) * (n**2) * r**2 / (3 * dz) * f
+
+    L = MU0 * 2 * (n**2) * r**2 / (3 * dz) * f
     return L
 
 
@@ -682,30 +712,6 @@ def L_thin_wall_lorentz(r, dr, dz, n):
 #  the more you filament, the better your accuracy
 #  the filamentation should match your current density
 #  and watch out for putting two filaments on top of eachother!
-
-# first, grab scipy's special elliptical integral functions E & K
-
-# turns out.. this isn't the way to make numba understand
-# scipy.. instead just install numba_scipy and it happens
-# automagically.
-
-# import scipy.special as sc
-
-# @jit('float64(float64)',nopython=True)
-# @njit
-# def ellipe(k):
-#    return sc.ellipe(k)
-
-# @jit('float64(float64)',nopython=True)
-# @njit
-# def ellipk(k):
-#    return sc.ellipk(k)
-
-# for this to work.. numba_scipy must be installed
-# and possibly has to be fixed..
-# I should add a test to check for missing and or broken numba_scipy
-
-# from scipy.special import ellipe, ellipk
 
 
 @njit

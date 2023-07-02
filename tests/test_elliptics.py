@@ -2,16 +2,19 @@
 
 import unittest
 
-from inductance.elliptics import ellipke
+import coverage_env  # noqa: F401
+
+from inductance.elliptics import celbd, ellipe, ellipk
 
 
 class TestElliptics(unittest.TestCase):
     """Test the elliptics module."""
 
-    def test_ellipke(self):
-        """Test the ellipke function."""
-        scipy_data = [
+    def setUp(self) -> None:
+        """Set up the test data."""
+        self.scipy_data = [
             (0.00, 1.5707963267948966, 1.5707963267948966),
+            (0.009, 1.574348623485514, 1.567256048466157),
             (0.05, 1.591003453790792, 1.5509733517804725),
             (0.10, 1.6124413487202192, 1.5307576368977633),
             (0.15, 1.63525673226458, 1.5101218320928198),
@@ -31,13 +34,23 @@ class TestElliptics(unittest.TestCase):
             (0.85, 2.38901648632558, 1.1433957918831659),
             (0.90, 2.5780921133481733, 1.1047747327040733),
             (0.95, 2.9083372484445524, 1.0604737277662781),
+            (0.99, 3.6956373629898747, 1.015993545025223987),
         ]
+        return super().setUp()
 
-        for m, k, e in scipy_data:
-            self.assertAlmostEqual(
-                ellipke(m)[0], k, places=14
-            )  # this fails at the 15th place
-            self.assertAlmostEqual(ellipke(m)[1], e, places=14)
+    def test_ellipke(self):
+        """Test the ellipke function."""
+        for m, k, e in self.scipy_data:
+            # this fails at the 15th place
+            self.assertAlmostEqual(ellipk(m), k, places=14)
+            self.assertAlmostEqual(ellipe(m), e, places=14)
+
+    def test_celbd(self):
+        """Test the celbd function. Which is to be compared with ellipkm1 in scipy.special."""
+        mc = 1e-16
+        b, d = celbd(mc)
+        k = b + d
+        self.assertAlmostEqual(19.806975105072258, k, places=14)
 
 
 if __name__ == "__main__":

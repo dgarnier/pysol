@@ -9,4 +9,4 @@
 /src/*.egg-info/
 __pycache__/
 src/inductance/_version.py
-tests/test_new_dipole.py
+new_dipole.py
