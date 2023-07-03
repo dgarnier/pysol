@@ -5,7 +5,7 @@ import unittest
 import coverage_env  # noqa: F401
 import numpy as np
 
-from inductance.inductance import L_lyle4, L_maxwell, L_thin_wall_lorentz, _lyle_terms
+from inductance.self import L_lyle4, L_maxwell, L_thin_wall_lorentz, _lyle_terms
 
 
 class TestSelfInductances(unittest.TestCase):

@@ -14,15 +14,8 @@ so.. don't need numba_scipy which lags numba and scipy often.
 from math import log
 from typing import Tuple
 
-# use numba if its installed
-try:
-    from numba import njit
+from ._numba import njit
 
-except ImportError:  # pragma: no cover
-    from warnings import warn
-
-    WARNING = "Couldn't import Numba. Elliptic integrals will run slower than expected."
-    warn(WARNING, RuntimeWarning)
 
 # fmt: off
 @njit("UniTuple(float64, 2)(float64)")
