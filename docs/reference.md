@@ -10,10 +10,24 @@
    :members:
 ```
 
-### inductance
+### Coils
 
 ```{eval-rst}
-.. automodule:: inductance.inductance
+.. automodule:: inductance.coils
+   :members:
+```
+
+### Self inductance
+
+```{eval-rst}
+.. automodule:: inductance.self
+   :members:
+```
+
+### Mutual inductance
+
+```{eval-rst}
+.. automodule:: inductance.mutual
    :members:
 ```
 

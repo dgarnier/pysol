@@ -5,7 +5,7 @@ import unittest
 import coverage_env  # noqa: F401
 import numpy as np
 
-from inductance.inductance import L_lyle4, L_maxwell, L_thin_wall_lorentz, _lyle_terms
+from inductance.self import L_lorentz, L_lyle4, L_maxwell, _lyle_terms
 
 
 class TestSelfInductances(unittest.TestCase):
@@ -15,16 +15,12 @@ class TestSelfInductances(unittest.TestCase):
         """Test Maxwell's formula."""
         self.assertAlmostEqual(L_maxwell(1, 1e-4, 1, 1), 20.7463e-7, places=6)
 
-    def test_L_thin_wall_lorentz(self):
+    def test_L_lorentz(self):
         """Test thin-wall Lorentz formula. See Lyle pg. 429."""
         mu0 = 4e-7 * np.pi
-        self.assertAlmostEqual(
-            L_thin_wall_lorentz(1, 0.0, 2, 1) / mu0, 1.08137, places=5
-        )
-        self.assertAlmostEqual(L_thin_wall_lorentz(1, 0.0, 1, 1), 20.7463e-7, places=6)
-        self.assertAlmostEqual(
-            L_thin_wall_lorentz(1, 0.0, 0.5, 1), 28.85335e-7, places=7
-        )
+        self.assertAlmostEqual(L_lorentz(1, 0.0, 2, 1) / mu0, 1.08137, places=5)
+        self.assertAlmostEqual(L_lorentz(1, 0.0, 1, 1), 20.7463e-7, places=6)
+        self.assertAlmostEqual(L_lorentz(1, 0.0, 0.5, 1), 28.85335e-7, places=7)
 
     def test_L_lyle4(self):
         """Test Lyle's formula against Lorentz thin-wall. See Lyle pg. 429."""
@@ -37,7 +33,7 @@ class TestSelfInductances(unittest.TestCase):
         """Test Lyle's formula against his table. See Lyle pg. 429."""
         table1 = np.array(
             [  # Lyle's Table 1
-                #   [0.00, 1.5, 0.223130],    FIXME: This is the correct value
+                [0.00, 1.5, 0.223130],
                 [0.025, 1.474734, 0.223328],
                 [0.05, 1.451005, 0.223455],
                 [0.10, 1.407566, 0.223599],
