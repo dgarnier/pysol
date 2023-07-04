@@ -21,12 +21,11 @@ from .filaments import (
 )
 from .self import (
     L_long_solenoid_butterworth,
+    L_lorentz,
     L_lyle4,
     L_lyle6,
     L_lyle6_appendix,
     L_maxwell,
-    L_thin_wall_babic_akyel,
-    L_thin_wall_lorentz,
     dLdR_lyle6,
 )
 
@@ -123,33 +122,29 @@ class Coil:
         """Inductance by Butterworth's formula."""
         return L_long_solenoid_butterworth(self.r, self.dr, self.dz, self.nt)
 
-    def L_thin_wall_babic_akyel(self):
-        """Inductance by Babic and Akyel's formula."""
-        return L_thin_wall_babic_akyel(self.r, self.dr, self.dz, self.nt)
-
-    def L_thin_wall_lorentz(self):
+    def L_lorentz(self):
         """Inductance by Lorentz's formula."""
-        return L_thin_wall_lorentz(self.r, self.dr, self.dz, self.nt)
+        return L_lorentz(self.r, self.dr, self.dz, self.nt)
 
     def dLdR_Lyle6(self):
         """Derivative of inductance by Lyle's formula, 6th order."""
         return dLdR_lyle6(self.r, self.dr, self.dz, self.nt)
 
-    def M_filament(self, C2: type[Coil]) -> float:
+    def M_filament(self, C2: Coil) -> float:
         """Mutual inductance of two coils by filamentation."""
         return mutual_inductance_of_filaments(self.fils, C2.fils)
 
-    def Fz_filament(self, C2: type[Coil]) -> float:
+    def Fz_filament(self, C2: Coil) -> float:
         """Vertical force of two coils by filamentation."""
         F_a2 = vertical_force_of_filaments(self.fils, C2.fils)
         return self.at / self.nt * C2.at / C2.nt * F_a2
 
-    def Fr_self(self, C2: type[Coil]) -> float:
+    def Fr_self(self) -> float:
         """Radial force of coil on itself."""
         dLdR = dLdR_lyle6(self.r, self.dr, self.dz, self.nt)
         return (self.at / self.nt) ** 2 / 2 * dLdR
 
-    def Fr_filament(self, C2: type[Coil]) -> float:
+    def Fr_filament(self, C2: Coil) -> float:
         """Radial force of two coils by filamentation."""
         F_r2 = radial_force_of_filaments(self.fils, C2.fils)
         return self.at / self.nt * C2.at / C2.nt * F_r2

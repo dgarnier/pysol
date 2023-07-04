@@ -46,15 +46,37 @@ def _lyle_terms(b, c):
     #         and gives inaccurate results when b/c ~ 1e6 or 1e-6
     # phi should approach 1.5 and GMD should approach (b+c)*exp(-1.5)
 
+    # for small b/c, u and wp need to be calculated with more precision
+    # for small c/b, v and w need more precision
+    # will try to use limit functions
+
+    boc2 = (b / c) ** 2
+    if b == 0:
+        u, v, w, p = 0, 1, 0, 1
+    elif c == 0:
+        u, v, w, p = 1, 0, 1, 0
+    elif boc2 < 1e-8:
+        u = -boc2 * math.log(boc2) + boc2**2 - boc2**3 / 2
+        v = 1 - boc2 / 2 + boc2**2 / 3
+        w = math.pi / 2 * (b / c) - boc2 + boc2**2 / 3
+        p = 1 - boc2 / 3 + boc2**2 / 5
+    elif boc2 > 1e8:
+        cob2 = (c / b) ** 2
+        u = 1 - cob2 / 2 + cob2**2 / 3
+        v = -cob2 * math.log(cob2) + cob2**2 - cob2**3 / 2
+        w = 1 - cob2 / 3 + cob2**2 / 5  # taylor series
+        p = math.pi / 2 * (c / b) - cob2 + cob2**2 / 3  # laurent series
+    else:
+        u = ((b / c) ** 2) * math.log(1 + (c / b) ** 2)
+        v = ((c / b) ** 2) * math.log(1 + (b / c) ** 2)
+        w = (b / c) * math.atan2(c, b)
+        p = (c / b) * math.atan2(b, c)
+
     d = np.sqrt(b**2 + c**2)  # diagnonal length
-    u = ((b / c) ** 2) * 2 * np.log(d / b)
-    v = ((c / b) ** 2) * 2 * np.log(d / c)
-    w = (b / c) * np.arctan(c / b)
-    wp = (c / b) * np.arctan(b / c)
-    phi = (u + v + 25) / 12 - 2 * (w + wp) / 3
+    phi = (u + v + 25) / 12 - 2 * (w + p) / 3
     GMD = d * np.exp(-phi)  # geometric mean radius of section GMD
 
-    return d, u, v, w, wp, phi, GMD
+    return d, u, v, w, p, phi, GMD
 
 
 if USE_MPMATH:  # pragma: no cover
@@ -511,31 +533,15 @@ if USE_MPMATH:
 
 
 @njit
-def L_long_solenoid(r, _dr, dz, n):
-    """Self inductance of a long solenoid.
-
-    Args:
-        r (float): coil centerline radius
-        _dr (float): coil radial width (ignored)
-        dz (float): coil height
-        n (int): number of turns
-
-    Returns:
-        float: coil self inductance in Henrys
-    """
-    a = float(r)
-    b = float(dz)
-    # c = float(dr)
-    L1 = MU0 * np.pi * (n**2) * a**2 / b
-    return L1
-
-
-@njit
 def L_long_solenoid_butterworth(r, dr, dz, n):
     """Self inductance of a long solenoid by Butterworth's formula.
 
     As written in Grover, Bulletin of the Bureau of Standards, Vol. 14 pg. 558
     https://nvlpubs.nist.gov/nistpubs/bulletin/14/nbsbulletinv14n4p537_A2b.pdf
+
+    Original S Butterworth 1914 Proc. Phys. Soc. London 27 371
+
+    Applies when dz > 2*r.
 
     Args:
         r (float): coil centerline radius
@@ -549,7 +555,7 @@ def L_long_solenoid_butterworth(r, dr, dz, n):
     a = float(r)
     b = float(dz)
     c = float(dr)
-    L = 4e-7 * np.pi * (n**2) * a / b
+    # L = 4e-7 * np.pi * (n**2) * a / b
 
     k2 = 4 * a**2 / (4 * a**2 + b**2)
     kp2 = b**2 / (4 * a**2 + b**2)
@@ -565,48 +571,48 @@ def L_long_solenoid_butterworth(r, dr, dz, n):
     beta = q**2 + 3 * q**6 + 6 * q**12
     alpha = q**2 + q**6 + q**12
 
-    K = (
+    K = (  # K
         2.0
         / (3 * (1 - delta) ** 2)
         * (1 + 8 * beta / (1 + alpha) + kp2 / k2 * 8 * gamma / (1 - delta))
         - 4 / (3 * np.pi) * k / kp
     )
 
-    D = (
+    DL_L1 = (  # delta L/L_1, eq 29A
         -1
         / 3
         * (c / a)
         * (
             1
             - c / (4 * a)
-            - 1 / (2 * np.pi) * (c / b) * (np.log(8 * a / c) - 23.0 / 12)
+            - 1 / (2 * np.pi) * (c / b) * (np.log(8 * a / c) - 23 / 12)
             + 1
             / (160 * np.pi)
             * (c / a) ** 3
             * (a / b)
             * (np.log(8 * a / c) - 1.0 / 20)
-            - 1.0
+            - 1
             / 4
-            * (c / a)
-            * (a / b) ** 2
+            * (c * a / b**2)
             * (1 - 7 / 4 * (a / b) ** 2 + 17 / 4 * (a / b) ** 4)
-            - 1.0 / 96 * (c / a) ** 3 * (a / b) ** 2 * (1 - 39.0 / 10 * (a / b) ** 2)
+            - 1 / 96 * (c / a) ** 3 * (a / b) ** 2 * (1 - 39 / 10 * (a / b) ** 2)
         )
     )
-    D
-    # hmm.. not using D, wonder why I bothered to calculate it.. lets look back at this function
-    L = 4e-7 * np.pi * (n**2) * (a / b) * (K)
-    return L
+    L1 = L_lorentz(r, dr, dz, n)
+
+    return L1 * (K + DL_L1)
 
 
 @njit
-def L_thin_wall_babic_akyel(r, _dr, dz, n):
+def _L_thin_wall_babic_akyel(r, _dr, dz, n):
     """Self inductance thin wall solenoid by Babic and Akyel's formula.
 
     Follow formulae from:
     S. Babic and C. Akyel, "Improvement in calculation of the self- and mutual inductance
     of thin-wall solenoids and disk coils," in IEEE Transactions on Magnetics,
     vol. 36, no. 4, pp. 1970-1975, July 2000, doi: 10.1109/TMAG.2000.875240.
+
+    this _is_ be the same as Lorentz formula..
 
     Args:
         r (float): coil centerline radius
@@ -627,18 +633,25 @@ def L_thin_wall_babic_akyel(r, _dr, dz, n):
     k2 = 1 / (1 + beta**2)
     elk, ele = ellipke(k2)
     k = np.sqrt(k2)
-    tk = (
+    tk1 = (
         4.0
         / (3 * np.pi * beta * k**3)
         * ((2 * k2 - 1) * ele + (1 - k2) * elk - k**3)
     )
-    eq8 = MU0 * np.pi * (n**2) * r / (2 * beta) * tk  # eq 8
+    eq8 = MU0 * (n**2) * r * np.pi / (2 * beta) * tk1  # eq 8
     return eq8
 
 
 @njit
-def L_thin_wall_lorentz(r, _dr, dz, n):
+def L_lorentz(r, _dr, dz, n):
     """Self inductance of a thin wall solenoid by Lorentz's formula.
+
+    Given in:
+    Rosa and Grover, Formulas and Tables for the Calculation of Mutual and Self-Inductance
+    https://nvlpubs.nist.gov/nistpubs/bulletin/08/nbsbulletinv8n1p1_A2b.pdf
+    or
+    https://www.jstor.org/stable/pdf/24521000.pdf
+    (Formula 72 on page 118)
 
     Args:
         r (float): coil centerline radius
@@ -649,10 +662,12 @@ def L_thin_wall_lorentz(r, _dr, dz, n):
     Returns:
         float: coil self inductance in Henrys
     """
-    k2 = 4 * r**2 / (4 * r**2 + dz**2)
-    elk, ele = ellipke(k2)
-    k = math.sqrt(k2)
-    f = dz / (k * r) * elk - (dz**2 - 4 * r**2) / (k * r * dz) * ele - 4 * r / dz
+    beta = dz / (2 * r)
+    k2 = 1 / (1 + beta**2)
+    k3 = k2**1.5
+    beta2 = beta**2
+    elK, elE = ellipke(k2)
 
-    L = MU0 * 2 * (n**2) * r**2 / (3 * dz) * f
-    return L
+    f = 2 / 3 / beta2 * (((2 * k2 - 1) * elE + (1 - k2) * elK) / k3 - 1)
+    Ls = MU0 * (n**2) * r * f
+    return Ls

@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover
         "Numba disabled. Mutual inductance calculations "
         + "will not be accelerated and some API will not be available."
     )
-    _finfo = getframeinfo(currentframe().f_back)  # type: ignore
+    _finfo = getframeinfo(currentframe())  # type: ignore
     warn_explicit(_WARNING, RuntimeWarning, _finfo.filename, _finfo.lineno)
 
     def _jit(*args, **kwargs):
@@ -33,7 +33,7 @@ except ImportError:  # pragma: no cover
     def _guvectorize(*args, **kwds):
         def fake_decorator(f):
             warning = f"{f.__name__} requires Numba JIT."
-            finfo = getframeinfo(currentframe().f_back.f_back)  # type: ignore
+            finfo = getframeinfo(currentframe().f_back)  # type: ignore
             warn_explicit(warning, RuntimeWarning, finfo.filename, finfo.lineno)
             return lambda f: None
 
