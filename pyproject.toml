@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "inductance"
-version = "0.1.2"
+version = "0.1.3"
 description = "Code for 2D inductance calculations"
 authors = ["Darren Garnier <dgarnier@reinrag.net>"]
 license = "MIT"
