@@ -10,6 +10,7 @@ Filaments are defined as an numpy 3 element vector
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
 
@@ -83,6 +84,9 @@ class Coil:
         self.at = at
         self.theta = theta
         self.fils = None
+        self._L = None
+        self._r_c = None
+        self._z_c = None
 
         if kwargs:
             for key, value in kwargs.items():
@@ -123,6 +127,18 @@ class Coil:
     @property
     def z2(self):  # noqa: D102
         return self.z + self.dz / 2
+
+    @property
+    def r_c(self):  # noqa: D102
+        return self.r if self._r_c is None else self._r_c
+
+    @property
+    def z_c(self):  # noqa: D102
+        return self.z if self._z_c is None else self._z_c
+
+    @property
+    def conductor_length(self):  # noqa: D102
+        return self.r * self.nt * 2 * math.pi
 
     def L_best(self):
         """Inductance by best formula."""
@@ -223,22 +239,27 @@ class Coil:
 class CompositeCoil(Coil):
     """A coil made of multiple rectangular coils."""
 
-    def __init__(self, coils: list[Coil]):
+    def __init__(self, coils: list[Coil], **kwargs):
         """Create a composite coil from a list of _filamented_ coils."""
         self.coils = coils
-        self.nt = sum(coil.nt for coil in coils)
-        self.at = sum(coil.at for coil in coils)
-        self.r_c = sum(coil.r * coil.nt for coil in coils) / self.nt
+        nt = sum(coil.nt for coil in coils)
+        at = sum(coil.at for coil in coils)
         r1 = min(coil.r - coil.dr for coil in coils)
         r2 = max(coil.r + coil.dr for coil in coils)
-        self.r = (r1 + r2) / 2
-        self.dr = r2 - r1
+        r = (r1 + r2) / 2
+        dr = r2 - r1
         z1 = min(coil.z - coil.dz for coil in coils)
         z2 = max(coil.z + coil.dz for coil in coils)
-        self.z = (z1 + z2) / 2
-        self.dz = z2 - z1
-        self.z_c = sum(coil.z * coil.nt for coil in coils) / self.nt
+        z = (z1 + z2) / 2
+        dz = z2 - z1
+        Coil.__init__(self, r, z, dr, dz, nt, at, **kwargs)
+        self._r_c = sum(coil.r * coil.nt for coil in coils) / nt
+        self._z_c = sum(coil.z * coil.nt for coil in coils) / nt
         self.fils = np.concatenate([coil.fils for coil in coils])
+
+    @property
+    def conductor_length(self):  # noqa: D102
+        return sum(coil.conductor_length for coil in self.coils)
 
     def L_best(self):
         """Inductance of composite coils by best formula."""
