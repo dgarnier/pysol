@@ -38,7 +38,7 @@ class Shape(Enum):
 
     round = "round"
     hollow_round = "hollow_round"
-    rect = "rectangular"
+    rect = "rectangle"
 
 
 @dataclass
@@ -252,7 +252,7 @@ class CompositeCoil(Coil):
         return L
 
 
-def coilset_inductance_matrix(coils: list[Coil]):
+def coilset_mutual_inductance(coils: list[Coil]):
     """Get the inductance matrix of a set of coils.
 
     Args:
@@ -271,7 +271,7 @@ def coilset_inductance_matrix(coils: list[Coil]):
     return muts
 
 
-def coilset_fz_greens(coils: list[Coil]):
+def coilset_Fz_greens(coils: list[Coil]):
     """Calculate the vertical force matrix of a set of coils.
 
     Args:
@@ -288,7 +288,7 @@ def coilset_fz_greens(coils: list[Coil]):
     return mfz
 
 
-def coilset_fr_greens(coils: list[Coil]):
+def coilset_Fr_greens(coils: list[Coil]):
     """Calculate the radial force matrix of a set of coils.
 
     Args:
