@@ -62,7 +62,7 @@ class Conductor:
 class Coil:
     """Rectangular coil object to keep track of coil parameters."""
 
-    def __init__(self, r, z, dr, dz, nt=1, at=1, nr=0, nz=0, theta=0, **kwargs):
+    def __init__(self, r, z, dr, dz, nt=1, at=None, nr=0, nz=0, theta=0, **kwargs):
         """Create a rectangular coil object.
 
         Args:
@@ -73,7 +73,7 @@ class Coil:
             nt (int, optional): number of turns in coil
             nr (int, optional): Number of radial sections to filament coil. Defaults to 0.
             nz (int, optional): Number of axial sections to filament coil. Defaults to 0.
-            at (float, optional): Amperage of coil. Defaults to 0.
+            at (float, optional): Amperage of coil. Defaults to nt Amps.
             theta (float, optional): Rotation angle in radians. Defaults to 0.
         """
         self.r = r
@@ -81,6 +81,8 @@ class Coil:
         self.dr = dr
         self.dz = dz
         self.nt = nt
+        if at is None:
+            at = nt
         self.at = at
         self.theta = theta
         self.fils = None
