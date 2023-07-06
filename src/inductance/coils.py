@@ -75,6 +75,7 @@ class Coil:
             nz (int, optional): Number of axial sections to filament coil. Defaults to 0.
             at (float, optional): Amperage of coil. Defaults to nt Amps.
             theta (float, optional): Rotation angle in radians. Defaults to 0.
+            **kwargs: Additional arguments to store in the coil object.
         """
         self.r = r
         self.z = z

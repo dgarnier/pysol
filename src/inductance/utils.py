@@ -10,48 +10,46 @@ from ._numba import njit
 
 
 @njit
-def _lyle_terms(dz, dr):
-    #  helper functions for most self inductance equations.
-    # b : cylindrical height of coil
-    # c : radial width of coil
+def _lyle_terms(b, c):
+    """Helper function for Lyle's self-inductance equations.
 
-    # when b/c or c/b is very large or small, this diverges
-    # and gives inaccurate results when b/c ~ 1e6 or 1e-6
-    # now added a check for this and use a series expansion
+    Args:
+        b (float): length of coil
+        c (float): radial width of coil
+
+    Returns:
+        : _description_
+    """
+    # the basic formulae and gives inaccurate results when b/c ~ 1e6 or 1e-6
     # phi should approach 1.5 and GMD should approach (b+c)*exp(-1.5)
-
-    # for small b/c, u and wp need to be calculated with more precision
-    # for small c/b, v and w need more precision
-    # will try to use limit functions
-
-    if dz < dr:
-        b, c = dz, dr
-    else:
-        c, b = dr, dz
-
-    boc = b / c
-    boc2 = boc**2
-
-    if boc == 0:
+    # so special case the ends, and for small and large b/c
+    # will try to use limit functions and series expansions
+    boc2 = (b / c) ** 2
+    if b == 0:
         u, v, w, p = 0, 1, 0, 1
-    elif boc < 1e-5:
+    elif c == 0:
+        u, v, w, p = 1, 0, 1, 0
+    elif boc2 < 1e-8:
         u = -boc2 * math.log(boc2) + boc2**2 - boc2**3 / 2
         v = 1 - boc2 / 2 + boc2**2 / 3
         w = math.pi / 2 * (b / c) - boc2 + boc2**2 / 3
         p = 1 - boc2 / 3 + boc2**2 / 5
+    elif boc2 > 1e8:
+        cob2 = (c / b) ** 2
+        u = 1 - cob2 / 2 + cob2**2 / 3
+        v = -cob2 * math.log(cob2) + cob2**2 - cob2**3 / 2
+        w = 1 - cob2 / 3 + cob2**2 / 5  # taylor series
+        p = math.pi / 2 * (c / b) - cob2 + cob2**2 / 3  # laurent series
     else:
         u = ((b / c) ** 2) * math.log(1 + (c / b) ** 2)
         v = ((c / b) ** 2) * math.log(1 + (b / c) ** 2)
         w = (b / c) * math.atan2(c, b)
         p = (c / b) * math.atan2(b, c)
 
-    if dr > dz:
-        u, v = v, u
-        w, p = p, w
-
     d = np.sqrt(b**2 + c**2)  # diagnonal length
     phi = (u + v + 25) / 12 - 2 * (w + p) / 3
     GMD = d * np.exp(-phi)  # geometric mean radius of section GMD
+
     return d, u, v, w, p, phi, GMD
 
 
@@ -60,7 +58,10 @@ def rectangle_GMD(dr, dz):
 
     Args:
         dr (float): width of rectangle
-        dz (_type_): height of rectangle
+        dz (float): height of rectangle
+
+    Returns:
+        float: GMD of rectangle
     """
     return _lyle_terms(dz, dr)[-1]
 
