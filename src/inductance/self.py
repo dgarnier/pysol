@@ -23,78 +23,13 @@ import math
 
 import numpy as np
 
-from ._numba import njit
+from ._numba import njit, prange
 from .elliptics import ellipke
-
-try:
-    from mpmath import mp  # type: ignore
-
-    USE_MPMATH = True
-except ImportError:  # pragma: no cove
-    USE_MPMATH = False
+from .filaments import mutual_inductance_fil
+from .mutual import lyle_equivalent_subcoil_filaments, mutual_lyles_method
+from .utils import _lyle_terms, section_coil
 
 MU0 = 4e-7 * math.pi  # permeability of free space
-
-
-@njit
-def _lyle_terms(b, c):
-    #  helper functions for most self inductance equations.
-    # b : cylindrical height of coil
-    # c : radial width of coil
-
-    # FIXME:  when b/c or c/b is very large or small, this diverges
-    #         and gives inaccurate results when b/c ~ 1e6 or 1e-6
-    # phi should approach 1.5 and GMD should approach (b+c)*exp(-1.5)
-
-    # for small b/c, u and wp need to be calculated with more precision
-    # for small c/b, v and w need more precision
-    # will try to use limit functions
-
-    boc2 = (b / c) ** 2
-    if b == 0:
-        u, v, w, p = 0, 1, 0, 1
-    elif c == 0:
-        u, v, w, p = 1, 0, 1, 0
-    elif boc2 < 1e-8:
-        u = -boc2 * math.log(boc2) + boc2**2 - boc2**3 / 2
-        v = 1 - boc2 / 2 + boc2**2 / 3
-        w = math.pi / 2 * (b / c) - boc2 + boc2**2 / 3
-        p = 1 - boc2 / 3 + boc2**2 / 5
-    elif boc2 > 1e8:
-        cob2 = (c / b) ** 2
-        u = 1 - cob2 / 2 + cob2**2 / 3
-        v = -cob2 * math.log(cob2) + cob2**2 - cob2**3 / 2
-        w = 1 - cob2 / 3 + cob2**2 / 5  # taylor series
-        p = math.pi / 2 * (c / b) - cob2 + cob2**2 / 3  # laurent series
-    else:
-        u = ((b / c) ** 2) * math.log(1 + (c / b) ** 2)
-        v = ((c / b) ** 2) * math.log(1 + (b / c) ** 2)
-        w = (b / c) * math.atan2(c, b)
-        p = (c / b) * math.atan2(b, c)
-
-    d = np.sqrt(b**2 + c**2)  # diagnonal length
-    phi = (u + v + 25) / 12 - 2 * (w + p) / 3
-    GMD = d * np.exp(-phi)  # geometric mean radius of section GMD
-
-    return d, u, v, w, p, phi, GMD
-
-
-if USE_MPMATH:  # pragma: no cover
-
-    def _lyle_terms_mp(b, c):
-        # b : cylindrical height of coil
-        # c : radial width of coil
-
-        # this does NOT fix problem with b/c ~ 1e6 or 1e-6
-
-        d = mp.sqrt(b**2 + c**2)  # diagnonal length
-        u = ((b / c) ** 2) * 2 * mp.log(d / b)
-        v = ((c / b) ** 2) * 2 * mp.log(d / c)
-        w = (b / c) * mp.atan(c / b)
-        wp = (c / b) * mp.atan(b / c)
-        phi = (u + v + 25) / 12 - 2 * (w + wp) / 3
-        GMD = d * mp.exp(-phi)  # geometric mean radius of section GMD
-        return d, u, v, w, wp, phi, GMD
 
 
 @njit
@@ -151,7 +86,7 @@ def L_hollow_round(r, a, n):
 
 
 @njit
-def L_lyle4_eq3(r, dr, dz, n):
+def L_lyle4(r, dr, dz, n):
     """Self inductance of a rectangular coil via Lyle to 4th order, Eq3.
 
     Args:
@@ -215,11 +150,15 @@ def L_lyle4_eq3(r, dr, dz, n):
 # equation 4.. slightly different result... not sure which is better.
 # equation 3 above matches what I did for the 6th order.
 # and it also seems to match the 4th order in the paper.
+# and in other papers with examples
 
 
 @njit
 def L_lyle4_eq4(r, dr, dz, n):
     """Self inductance of a rectangular coil via Lyle to 4th order, Eq4.
+
+    this doesn't give quite the same answer as eq3 above.
+    and it doesn't seem to work as well.
 
     Args:
         r (float): coil centerline radius
@@ -277,9 +216,6 @@ def L_lyle4_eq4(r, dr, dz, n):
 
     eq4 = MU0 * (n**2) * A * (np.log(8 * A / R) - 2)
     return eq4
-
-
-L_lyle4 = L_lyle4_eq3
 
 
 @njit
@@ -447,89 +383,38 @@ def L_lyle6_appendix(r, dr, dz, n):
     )
 
     # just add the correction to the 4th order solution
-    L6 = L_lyle4_eq3(r, dr, dz, n) + 4e-7 * np.pi * (n**2) * a * (d / a) ** 6 * (
+    L6 = L_lyle4(r, dr, dz, n) + 4e-7 * np.pi * (n**2) * a * (d / a) ** 6 * (
         p6 * np.log(8 * a / d) + q6
     )
     # print("Lyle6A r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.8g"%(a,c,b,n,L6))
     return L6
 
 
-if USE_MPMATH:
+@njit
+def L_lyle_sectioning(r, dr, dz, nt, nr, nz):
+    """Self inductance by sectioning, Lyle's method, and Lyle's 4th order.
 
-    def L_lyle6_mp(r, dr, dz, n):
-        """Self inductance of a rectangular coil via Lyle to 6th order.
+    Args:
+        r (float): coil centerline radius
+        dr (float): coil radial width
+        dz (float): coil height
+        nt (float): number of turns
+        nr (int): number of radial sections
+        nz (int): number of axial sections
 
-        This function uses the mpmath arbitrary precision library to
-        calculate to arbitrary precision.  The default precision is 30.
+    Returns:
+        float: coil self inductance in Henrys
+    """
+    L = 0
+    subcoils = section_coil(r, dr, dz, nt, nt, nr, nz)
+    fils = lyle_equivalent_subcoil_filaments(subcoils)
 
-        Args:
-            r (float): coil centerline radius
-            dr (float): coil radial width
-            dz (float): coil height
-            n (int): number of turns
-
-        Returns:
-            float: coil self inductance in Henrys
-        """
-        mp.dps = 30
-        a = mp.mpf(r)
-        b = mp.mpf(dz)
-        c = mp.mpf(dr)
-        d, u, v, w, wp, phi, GMD = _lyle_terms_mp(b, c)
-        ML = mp.log(8 * a / d)
-
-        f = (
-            ML
-            + (u + v + 1) / 12
-            - mp.mpf(2) / 3 * (w + wp)
-            + 1
-            / (2**5 * 3 * a**2)
-            * (
-                (3 * b**2 + c**2) * ML
-                + mp.mpf(1) / 2 * b**2 * u
-                - 1.0 / 10 * c**2 * v
-                - 16.0 / 5 * b**2 * w
-                + 69.0 / 20 * b**2
-                + 221.0 / 60 * c**2
-            )
-            + mp.mpf(1)
-            / (2**11 * 3 * 5 * a**4)
-            * (
-                (-30 * b**4 + 35 * b**2 * c**2 + mp.mpf(22) / 3 * c**4) * ML
-                - (115 * b**4 - 480 * b**2 * c**2) / 12 * u
-                - mp.mpf(23) / 28 * c**4 * v
-                + (6 * b**4 - 7 * b**2 * c**2) / 21 * 2**8 * w
-                - (36590 * b**4 - 2035 * b**2 * c**2 - 11442 * c**4)
-                / (2**3 * 3 * 5 * 7)
-            )
-            + (mp.mpf(1) / (2**16 * 3 * 5 * 7 * a**6))
-            * (
-                (
-                    525 * b**6
-                    - 1610 * b**4 * c**2
-                    + 770 * b**2 * c**4
-                    + 103 * c**6
-                )
-                * ML
-                + (
-                    mp.mpf(3633) / 10 * b**6
-                    - 3220 * b**4 * c**2
-                    + 2240 * b**2 * c**4
-                )
-                * u
-                - mp.mpf(359) / 30 * c**6 * v
-                - 2**11
-                * ((25 * b**6 - 60 * b**4 * c**2 + 21 * b**2 * c**4) / 15)
-                * w
-                + mp.mpf(2161453) / (2**3 * 3 * 5 * 7) * b**6
-                - mp.mpf(617423) / ((2**2) * (3**2) * 5) * b**4 * c**2
-                - mp.mpf(8329) / ((2**2) * 3 * 5) * b**2 * c**4
-                + mp.mpf(4308631) / (2**3 * 3 * 5 * 7) * c**6
-            )
-        )
-        L = 4e-7 * mp.pi * (n**2) * a * f
-        # print("Lyle6mp r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.8g"%(a,c,b,n,L))
-        return L
+    for i in range(nr * nz):
+        for j in range(nr * nz):
+            if i != j:
+                L += mutual_lyles_method(*fils[i], *fils[j])
+        L += 2 * L_lyle6(*subcoils[i])
+    return L
 
 
 @njit
@@ -671,3 +556,31 @@ def L_lorentz(r, _dr, dz, n):
     f = 2 / 3 / beta2 * (((2 * k2 - 1) * elE + (1 - k2) * elK) / k3 - 1)
     Ls = MU0 * (n**2) * r * f
     return Ls
+
+
+@njit(parallel=True)
+def self_inductance_by_filaments(f, conductor="round", a=0.01, dr=0.01, dz=0.01):
+    """Self inductance of filament set.
+
+    Args:
+        f (array): first filament array
+        conductor (str, optional): conductor shape. Defaults to "round".
+        a (float, optional): conductor radius. Defaults to 0.01.
+        dr (float, optional): conductor radial width. Defaults to 0.01
+        dz (float, optional): conductor vertical height. Defaults to 0.01
+
+    Returns:
+        float: self inductance of filament set in Henries
+    """
+    L = float(0)
+    for i in prange(f.shape[0]):
+        for j in range(f.shape[0]):
+            if i != j:
+                L += mutual_inductance_fil(f[i, :], f[j, :])
+        if conductor == "round":
+            L += L_round(f[i, 0], a, f[i, 2])
+        elif conductor == "hollow_round":
+            L += L_hollow_round(f[i, 0], a, f[i, 2])
+        elif conductor == "rect":
+            L += L_lyle6(f[i, 0], dr, dz, f[i, 2])
+    return L
