@@ -250,3 +250,58 @@ class CompositeCoil(Coil):
                 else:
                     L += c1.M_filament(c2)
         return L
+
+
+def coilset_inductance_matrix(coils: list[Coil]):
+    """Get the inductance matrix of a set of coils.
+
+    Args:
+        coils (list[Coil]): set of coils
+
+    Returns:
+        np.ndarray: 2D array of inductances
+    """
+    muts = np.zeros([len(coils), len(coils)], dtype=float)
+    for i, ci in enumerate(coils):
+        for j, cj in enumerate(coils):
+            if i == j:
+                muts[i, j] = ci.L
+            else:
+                muts[i, j] = ci.M_filament(cj)
+    return muts
+
+
+def coilset_fz_greens(coils: list[Coil]):
+    """Calculate the vertical force matrix of a set of coils.
+
+    Args:
+        coils (list[Coil]): set of coils
+
+    Returns:
+        np.ndarray: 2D array of vertical forces per amp**2
+    """
+    mfz = np.zeros([len(coils), len(coils)], dtype=float)
+    for i, ci in enumerate(coils):
+        for j, cj in enumerate(coils):
+            if i != j:
+                mfz[i, j] = ci.Fz_filament(cj)
+    return mfz
+
+
+def coilset_fr_greens(coils: list[Coil]):
+    """Calculate the radial force matrix of a set of coils.
+
+    Args:
+        coils (list[Coil]): set of coils
+
+    Returns:
+        np.ndarray: 2D array of radial forces per amp**2
+    """
+    muts = np.zeros([len(coils), len(coils)], dtype=float)
+    for i, ci in enumerate(coils):
+        for j, cj in enumerate(coils):
+            if i == j:
+                muts[i, j] = ci.Fr_self()
+            else:
+                muts[i, j] = ci.Fr_filament(cj)
+    return muts
