@@ -9,16 +9,18 @@ import math
 import numpy as np
 
 from ._numba import njit
-
-# from .elliptics import ellipke
 from .filaments import mutual_inductance_fil, mutual_inductance_of_filaments
-
-MU0 = 4e-7 * math.pi  # permeability of free space
+from .utils import section_coil
 
 
 @njit
 def mutual_rayleigh(r1, z1, dr1, dz1, n1, r2, z2, dr2, dz2, n2):
     """Mutual inductance of two coils by Rayleigh's Quadrature Method.
+
+    reproduced in :
+    Rosa and Grover, "Formulas for the Mutual Inductance of
+    Coaxial Circular Coils of Rectangular Section,"
+    Bull. Natl. Bur. Stand., vol 8, no. 1, p. 34-35; 1911.
 
     Args:
         r1 (float): inner radius of coil 1
@@ -69,107 +71,121 @@ def mutual_rayleigh(r1, z1, dr1, dz1, n1, r2, z2, dr2, dz2, n2):
 
 
 @njit
-def mutual_lyle(r1, z1, dr1, dz1, n1, r2, z2, dr2, dz2, n2):
-    """Mutual inductance of two coils by Lyle's Method of Equivalent Filaments.
-
-    Args:
-        r1 (float): inner radius of coil 1
-        z1 (float): inner height of coil 1
-        dr1 (float): radial width of coil 1
-        dz1 (float): height of coil 1
-        n1 (int): number of turns in coil 1
-        r2 (float): inner radius of coil 2
-        z2 (float): inner height of coil 2
-        dr2 (float): radial width of coil 2
-        dz2 (float): height of coil 2
-        n2 (int): number of turns in coil 2
-
-    Returns:
-        float: mutual inductance of the two coils
-    """
-    fils1 = _lyle_equivalent_filaments(r1, z1, dr1, dz1)
-    fils2 = _lyle_equivalent_filaments(r2, z2, dr2, dz2)
-    return n1 * n2 * mutual_inductance_of_filaments(fils1, fils2)
-
-
-@njit
-def _lyle_equivalent_filaments(r, z, dr, dz):
+def lyle_equivalent_filaments(r, z, dr, dz, nt, fils):
     """Compute the equivalent filament locations for Lyle's method.
+
+    Using Lyle's Method of Equivalent Filaments.
+
+    originally from:
+        Lyle, Phil. Mag., 3, p. 310; 1902.
+
+    reproduced in:
+        Rosa and Grover, "Formulas for the Mutual Inductance of
+        Coaxial Circular Coils of Rectangular Section,"
+        Bull. Natl. Bur. Stand., vol 8, no. 1, p. 38-39; 1911.
 
     Args:
         r (float): inner radius of coil
         z (float): inner height of coil
         dr (float): radial width of coil
         dz (float): height of coil
-
-    Returns:
-        numpy.ndarray: equivalent filament locations
+        nt (float): number of turns in coil
+        fils (numpy.ndarray): array of filaments 2 x (r, z, n)
     """
     if dr < dz:
         req = r * (1 + dr**2 / (24 * r**2))
         beta = math.sqrt((dz**2 - dr**2) / 12)
-        fils = [[req, z - beta, 0.5], [req, z + beta, 0.5]]
+        fils[:, 0] = req
+        fils[:, 1] = z - beta, z + beta
     elif dr > dz:
         req = r * (1 + dz**2 / (24 * r**2))
-        delta = math.sqrt((dz**2 - dr**2) / 12)
-        fils = [[req - delta, z, 0.5], [req + delta, z, 0.5]]
+        delta = math.sqrt((dr**2 - dz**2) / 12)
+        fils[:, 0] = req - delta, req + delta
+        fils[:, 1] = z
     else:
         req = r * (1 + dz**2 / (24 * r**2))
-        fils = [[req, z, 1]]
-
-    return np.array(fils)
-
-
-def section_coil(r, z, dr, dz, nt, nr, nz):
-    """Create an array of filaments, each with its own radius, height, and amperage.
-
-    r : Major radius of coil center.
-    z : Vertical center of coil.
-    dr : Radial width of coil.
-    dz : Height of coil.
-    nt : number of turns in coil
-    nr : Number of radial slices
-    nz : Number of vertical slices
-
-    Returns:    Array of shape (nr*nz) x 5 of r, z, dr, dz, n for each section
-
-    """
-    rd = np.linspace(-dr * (nr - 1) / nr / 2, dr * (nr - 1) / nr / 2, nr)
-    zd = np.linspace(-dz * (nz - 1) / nz / 2, dz * (nz - 1) / nz / 2, nz)
-    Rg, Zg = np.meshgrid(rd, zd)
-
-    R = r + Rg
-    Z = z + Zg
-
-    DR = np.full_like(R, dr / nr)
-    DZ = np.full_like(R, dz / nz)
-    NT = np.full_like(R, float(nt) / (nr * nz))
-
-    return np.dstack([R, Z, DR, DZ, NT]).reshape(nr * nz, 5)
+        fils[:, 0] = req
+        fils[:, 1] = z
+    fils[:, 2] = 0.5 * nt
 
 
-def mutual_sectioning_lyle(r1, z1, dr1, dz1, n1, r2, z2, dr2, dz2, n2):
-    """Mutual inductance by sectioning of two coils by Lyle's Method of Equivalent Filaments.
+@njit
+def mutual_lyles_method(r1, z1, dr1, dz1, nt1, r2, z2, dr2, dz2, nt2):
+    """Mutual inductance of two coils by Lyle's method.
+
+    Using Lyle's Method of Equivalent Filaments.
+
+    originally from:
+    Lyle, Phil. Mag., 3, p. 310; 1902.
+
+    reproduced:
+    Rosa and Grover, "Formulas for the Mutual Inductance of
+    Coaxial Circular Coils of Rectangular Section,"
+    Bull. Natl. Bur. Stand., vol 8, no. 1, p. 38-39; 1911.
 
     Args:
         r1 (float): inner radius of coil 1
         z1 (float): inner height of coil 1
         dr1 (float): radial width of coil 1
         dz1 (float): height of coil 1
-        n1 (int): number of turns in coil 1
+        nt1 (int): number of turns in coil 1
         r2 (float): inner radius of coil 2
         z2 (float): inner height of coil 2
         dr2 (float): radial width of coil 2
         dz2 (float): height of coil 2
-        n2 (int): number of turns in coil 2
+        nt2 (int): number of turns in coil 2
 
     Returns:
         float: mutual inductance of the two coils
     """
-    # FIXME
-    # use section_coil
-    # need to be clever to keep it numba compatible
+    fils1 = np.zeros(2, 3)
+    fils2 = np.zeros(2, 3)
 
-    fils1 = _lyle_equivalent_filaments(r1, z1, dr1, dz1)
-    fils2 = _lyle_equivalent_filaments(r2, z2, dr2, dz2)
-    return n1 * n2 * mutual_inductance_of_filaments(fils1, fils2)
+    lyle_equivalent_filaments(r1, z1, dr1, dz1, nt1, fils1)
+    lyle_equivalent_filaments(r2, z2, dr2, dz2, nt2, fils1)
+    return mutual_inductance_of_filaments(fils1, fils2)
+
+
+@njit
+def lyle_equivalent_subcoil_filaments(subcoils):
+    """Compute the equivalent filament locations for set of subcoils."""
+    fils = np.zeros((subcoils.shape[0], 2, 3))
+    for i in range(subcoils.shape[0]):
+        lyle_equivalent_filaments(*subcoils[i, :], fils[i, :, :])
+    return fils
+
+
+def mutual_sectioning_lyle(
+    r1, z1, dr1, dz1, nt1, nr1, nz1, r2, z2, dr2, dz2, nt2, nr2, nz2
+):
+    """Mutual inductance by sectioning of two coils by Lyle's Method.
+
+    Section cois into subcoils and compute mutual inductance of each set
+    of subcoil using Lyle's method of equivalent filaments.
+
+    Args:
+        r1 (float): inner radius of coil 1
+        z1 (float): inner height of coil 1
+        dr1 (float): radial width of coil 1
+        dz1 (float): height of coil 1
+        nt1 (float): number of turns in coil 1
+        nr1 (int): number of radial sections in coil 1
+        nz1 (int): number of vertical sections in coil 1
+        r2 (float): inner radius of coil 2
+        z2 (float): inner height of coil 2
+        dr2 (float): radial width of coil 2
+        dz2 (float): height of coil 2
+        nt2 (float): number of turns in coil 2
+        nr2 (int): number of radial sections in coil 2
+        nz2 (int): number of vertical sections in coil 2
+
+    Returns:
+        float: mutual inductance of the two coils
+    """
+    subs_1 = section_coil(r1, z1, dr1, dz1, nt1, nr1, nz1)
+    subs_2 = section_coil(r2, z2, dr2, dz2, nt2, nr2, nz2)
+
+    fils_1 = lyle_equivalent_subcoil_filaments(subs_1).reshape(-1, 3)
+    fils_2 = lyle_equivalent_subcoil_filaments(subs_2).reshape(-1, 3)
+
+    return mutual_inductance_of_filaments(fils_1, fils_2)

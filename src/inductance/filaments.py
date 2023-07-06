@@ -1,10 +1,12 @@
 """Filamentary inductance calculations."""
 
+import math
+
 import numpy as np
 
 from ._numba import guvectorize, njit, prange
 from .elliptics import ellipke
-from .self import L_hollow_round, L_lyle6, L_round, _lyle_terms
+from .utils import rectangle_GMD, section_coil
 
 
 @njit
@@ -18,16 +20,12 @@ def mutual_inductance_fil(rzn1, rzn2):
     Returns:
         float: mutual inductance in Henrys
     """
-    r1 = rzn1[0]
-    r2 = rzn2[0]
-    z1 = rzn1[1]
-    z2 = rzn2[1]
-    n1 = rzn1[2]
-    n2 = rzn2[2]
+    r1, z1, n1 = rzn1
+    r2, z2, n2 = rzn2
 
     k2 = 4 * r1 * r2 / ((r1 + r2) ** 2 + (z1 - z2) ** 2)
     elk, ele = ellipke(k2)
-    amp = 2 * np.pi * r1 * 4e-7 * r2 / np.sqrt((r1 + r2) ** 2 + (z1 - z2) ** 2)
+    amp = 2 * math.pi * r1 * 4e-7 * r2 / math.sqrt((r1 + r2) ** 2 + (z1 - z2) ** 2)
     M0 = n1 * n2 * amp * ((2 - k2) * elk - 2 * ele) / k2
     return M0
 
@@ -43,15 +41,11 @@ def vertical_force_fil(rzn1, rzn2):
     Returns:
         float: force in Newtons/Amp^2
     """
-    r1 = rzn1[0]
-    r2 = rzn2[0]
-    z1 = rzn1[1]
-    z2 = rzn2[1]
-    n1 = rzn1[2]
-    n2 = rzn2[2]
+    r1, z1, n1 = rzn1
+    r2, z2, n2 = rzn2
 
     BrAt1 = BrGreen(r1, z1, r2, z2)
-    F = n1 * n2 * 2 * np.pi * r1 * BrAt1
+    F = n1 * n2 * 2 * math.pi * r1 * BrAt1
     return F
 
 
@@ -66,15 +60,11 @@ def radial_force_fil(rzn1, rzn2):
     Returns:
         float: force in Newtons/Amp^2
     """
-    r1 = rzn1[0]
-    r2 = rzn2[0]
-    z1 = rzn1[1]
-    z2 = rzn2[1]
-    n1 = rzn1[2]
-    n2 = rzn2[2]
+    r1, z1, n1 = rzn1
+    r2, z2, n2 = rzn2
 
     BzAt1 = BzGreen(r1, z1, r2, z2)
-    F = n1 * n2 * 2 * np.pi * r1 * BzAt1
+    F = n1 * n2 * 2 * math.pi * r1 * BzAt1
     return F
 
 
@@ -98,7 +88,7 @@ def AGreen(r, z, a, b):
     """
     k2 = 4 * a * r / ((r + a) ** 2 + (z - b) ** 2)
     elk, ele = ellipke(k2)
-    amp = 4e-7 * a / np.sqrt((r + a) ** 2 + (z - b) ** 2)
+    amp = 4e-7 * a / math.sqrt((r + a) ** 2 + (z - b) ** 2)
     return amp * ((2 - k2) * elk - 2 * ele) / k2
 
 
@@ -117,7 +107,7 @@ def BrGreen(r, z, a, b):
     """
     k2 = 4 * a * r / ((r + a) ** 2 + (z - b) ** 2)
     elk, ele = ellipke(k2)
-    amp = -2e-7 / np.sqrt((r + a) ** 2 + (z - b) ** 2)
+    amp = -2e-7 / math.sqrt((r + a) ** 2 + (z - b) ** 2)
     Gr = (a**2 + r**2 + (z - b) ** 2) / ((r - a) ** 2 + (z - b) ** 2)
     return amp * (z - b) / r * (Gr * ele - elk)
 
@@ -137,7 +127,7 @@ def BzGreen(r, z, a, b):
     """
     k2 = 4 * a * r / ((r + a) ** 2 + (z - b) ** 2)
     elk, ele = ellipke(k2)
-    amp = -2e-7 / np.sqrt((r + a) ** 2 + (z - b) ** 2)
+    amp = -2e-7 / math.sqrt((r + a) ** 2 + (z - b) ** 2)
     Gz = (a**2 - r**2 - (z - b) ** 2) / ((r - a) ** 2 + (z - b) ** 2)
     return amp * (Gz * ele + elk)
 
@@ -155,16 +145,15 @@ def green_sum_over_filaments(gfunc, fil, r, z):
     Returns:
         float: sum of the greens function at r, z, due to all filaments
     """
-    tmp = np.zeros_like(r)
-    tshp = tmp.shape
-    tmp = tmp.reshape((tmp.size,))
-    rf = r.reshape((tmp.size,))
-    zf = z.reshape((tmp.size,))
-    for j in prange(len(tmp)):
+    gr = np.zeros_like(r)  # numba must compile this in object mode
+    gf = gr.flat
+    rf = r.flat
+    zf = z.flat
+
+    for j in prange(len(gr)):  # numba will njit this loop
         for i in range(fil.shape[0]):
-            tmp.flat[j] += fil[i, 2] * gfunc(rf[j], zf[j], fil[i, 0], fil[i, 1])
-    tmp = tmp.reshape(tshp)
-    return tmp
+            gf[j] += fil[i, 2] * gfunc(rf[j], zf[j], fil[i, 0], fil[i, 1])
+    return gr
 
 
 def segment_path(pts, ds=0, close=False):
@@ -208,7 +197,7 @@ def _loop_segmented_mutual(r, z, pts):
     for i in range(pts.shape[0] - 1):
         midp = (pts[i, :] + pts[i + 1, :]) / 2
         delta = pts[i, :] - pts[i + 1, :]
-        rs = np.sqrt(midp[0] ** 2 + midp[1] ** 2)
+        rs = math.sqrt(midp[0] ** 2 + midp[1] ** 2)
         zs = midp[2]
         rdphi = (delta[0] * midp[1] - delta[1] * midp[0]) / rs
         M += AGreen(r, z, rs, zs) * rdphi
@@ -251,7 +240,7 @@ def segmented_self_inductance(pts, s, a):
     lets just assume the thing is broken into small pieces and neglect end points
 
     this code doesn't work very well.. comparison test sorta fails
-    phi = np.linspace(0,2*np.pi,100)
+    phi = np.linspace(0,2*math.pi,100)
     test_xyz = np.array([[np.cos(p), np.sin(p), 0] for p in phi])
     L_seg = L_approx_path_rect(test_xyz, .01, .01, 1, .1)
     L_maxwell(1, .01, .01, 1), L_lyle6(1, .01, .01, 1), L_seg
@@ -274,15 +263,13 @@ def segmented_self_inductance(pts, s, a):
     return 1e-7 * (L + LS)
 
 
-def L_approx_path_rect(pts, b, c, n, ds=1):
+def L_approx_path_rect(pts, w, h, n, ds=1):
     """Approximate self inductance of a path of points with a rectangular cross section.
 
     take a path of points n x 3, with a cross section b x c
     and approximate self inductance using Dengler
     """
-    _, _, _, _, _, _, a = _lyle_terms(
-        b, c
-    )  # get Maxwell mean radius to approximate "wire" radius
+    a = rectangle_GMD(w, h)  # get Maxwell mean radius to approximate "wire" radius
     ds *= a
     segs, s = segment_path(pts, ds)
     L = n**2 * segmented_self_inductance(segs, s, a)
@@ -355,7 +342,7 @@ def AGreenFil(fil, r, z, gr):
 
 
 # cant jit this... meshgrid not allowed
-def filament_coil(r, z, dr, dz, nt, nr, nz, rot=0):
+def filament_coil(r, z, dr, dz, nt, nr, nz, theta=0):
     """Create an array of filaments, each with its own radius, height, and amperage.
 
     r : Major radius of coil center.
@@ -365,20 +352,12 @@ def filament_coil(r, z, dr, dz, nt, nr, nz, rot=0):
     nt : number of turns in coil
     nr : Number of radial slices
     nz : Number of vertical slices
-    rot : Rotation of coil about phi axis
+    theta : Rotation of coil about phi axis
 
     Returns:    Array of shape (nr*nz) x 3 of R, Z, N for each filament
-
     """
-    rd = np.linspace(-dr * (nr - 1) / nr / 2, dr * (nr - 1) / nr / 2, nr)
-    zd = np.linspace(-dz * (nz - 1) / nz / 2, dz * (nz - 1) / nz / 2, nz)
-    Rg, Zg = np.meshgrid(rd, zd)
-
-    R = r + Rg * np.cos(rot) - Zg * np.sin(rot)
-    Z = z + Rg * np.sin(rot) + Zg * np.cos(rot)
-
-    N = np.full_like(R, float(nt) / (nr * nz))
-    return np.dstack([R, Z, N]).reshape(nr * nz, 3)
+    sects = section_coil(r, z, dr, dz, nt, nr, nz, theta=theta)
+    return sects[:, [0, 1, 4]]
 
 
 @njit(parallel=True)
@@ -419,34 +398,6 @@ def mutual_inductance_of_filaments(f1, f2):
         for j in range(f2.shape[0]):
             M += mutual_inductance_fil(f1[i, :], f2[j, :])
     return M
-
-
-@njit(parallel=True)
-def self_inductance_by_filaments(f, conductor="round", a=0.01, dr=0.01, dz=0.01):
-    """Self inductance of filament set.
-
-    Args:
-        f (array): first filament array
-        conductor (str, optional): conductor shape. Defaults to "round".
-        a (float, optional): conductor radius. Defaults to 0.01.
-        dr (float, optional): conductor radial width. Defaults to 0.01
-        dz (float, optional): conductor vertical height. Defaults to 0.01
-
-    Returns:
-        float: self inductance of filament set in Henries
-    """
-    L = float(0)
-    for i in prange(f.shape[0]):
-        for j in range(f.shape[0]):
-            if i != j:
-                L += mutual_inductance_fil(f[i, :], f[j, :])
-        if conductor == "round":
-            L += L_round(f[i, 0], a, f[i, 2])
-        elif conductor == "hollow_round":
-            L += L_hollow_round(f[i, 0], a, f[i, 2])
-        elif conductor == "rect":
-            L += L_lyle6(f[i, 0], dr, dz, f[i, 2])
-    return L
 
 
 @njit(parallel=True)
