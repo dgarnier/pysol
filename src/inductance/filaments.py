@@ -6,12 +6,20 @@ import numpy as np
 
 from ._numba import guvectorize, njit, prange
 from .elliptics import ellipke
-from .utils import rectangle_GMD, section_coil
+from .utils import gmd_rectangle, section_coil
+
+MU0 = 4e-7 * math.pi
 
 
 @njit
-def mutual_inductance_fil(rzn1, rzn2):
+def mutual_fil(rzn1, rzn2):
     """Mutual inductance of two filaments.
+
+    First given by:
+    Maxwell, J. C., "A Treatise on Electricity and Magnetism", Vol. 2,
+    Section 701, pg. 305 (1873). Clarendon Press Series, MacMillan and Co.
+
+    converted to python and using SI units
 
     Args:
         rzn1 (array): (r, z, n) of first filament
@@ -24,14 +32,20 @@ def mutual_inductance_fil(rzn1, rzn2):
     r2, z2, n2 = rzn2
 
     k2 = 4 * r1 * r2 / ((r1 + r2) ** 2 + (z1 - z2) ** 2)
-    elk, ele = ellipke(k2)
-    amp = 2 * math.pi * r1 * 4e-7 * r2 / math.sqrt((r1 + r2) ** 2 + (z1 - z2) ** 2)
-    M0 = n1 * n2 * amp * ((2 - k2) * elk - 2 * ele) / k2
-    return M0
+    if k2 > 0.99:  # close filament form (also by Maxwell)
+        dmax = math.sqrt((r1 + r2) ** 2 + (z1 - z2) ** 2)
+        dmin = math.sqrt((r1 - r2) ** 2 + (z1 - z2) ** 2)
+        k_1 = (dmax - dmin) / (dmax + dmin)
+        elk1, ele1 = ellipke(k_1**2)
+        amp = 2 * math.sqrt(r1 * r2 / k_1) * (elk1 - ele1)
+    else:
+        elk, ele = ellipke(k2)
+        amp = math.sqrt(r1 * r2 / k2) * ((2 - k2) * elk - 2 * ele)
+    return MU0 * n1 * n2 * amp
 
 
 @njit
-def vertical_force_fil(rzn1, rzn2):
+def Fz_green_fil(rzn1, rzn2):
     """Vertical force  between two filaments per conductor amp.
 
     Args:
@@ -50,7 +64,7 @@ def vertical_force_fil(rzn1, rzn2):
 
 
 @njit
-def radial_force_fil(rzn1, rzn2):
+def Fr_green_fil(rzn1, rzn2):
     """Radial force  between two filaments per conductor amp.
 
     Args:
@@ -214,7 +228,7 @@ def mutual_filaments_segmented(fils, pts):
     return M
 
 
-def M_filsol_path(fil, pts, nt, ds=0):
+def mutual_fil_path(fil, pts, nt, ds=0):
     """Mutual inductance between a set of axisymmetric filaments and a path from pts."""
     segs, _ = segment_path(pts, ds)
     return nt * mutual_filaments_segmented(fil, segs)
@@ -269,7 +283,7 @@ def L_approx_path_rect(pts, w, h, n, ds=1):
     take a path of points n x 3, with a cross section b x c
     and approximate self inductance using Dengler
     """
-    a = rectangle_GMD(w, h)  # get Maxwell mean radius to approximate "wire" radius
+    a = gmd_rectangle(w, h)  # get Maxwell mean radius to approximate "wire" radius
     ds *= a
     segs, s = segment_path(pts, ds)
     L = n**2 * segmented_self_inductance(segs, s, a)
@@ -396,7 +410,7 @@ def mutual_inductance_of_filaments(f1, f2):
     M = float(0)
     for i in prange(f1.shape[0]):
         for j in range(f2.shape[0]):
-            M += mutual_inductance_fil(f1[i, :], f2[j, :])
+            M += mutual_fil(f1[i, :], f2[j, :])
     return M
 
 
@@ -417,7 +431,7 @@ def vertical_force_of_filaments(f1, f2):
     F = float(0)
     for i in prange(f1.shape[0]):
         for j in range(f2.shape[0]):
-            F += vertical_force_fil(f1[i, :], f2[j, :])
+            F += Fz_green_fil(f1[i, :], f2[j, :])
     return F
 
 
@@ -438,5 +452,5 @@ def radial_force_of_filaments(f1, f2):
     F = float(0)
     for i in prange(f1.shape[0]):
         for j in range(f2.shape[0]):
-            F += radial_force_fil(f1[i, :], f2[j, :])
+            F += Fr_green_fil(f1[i, :], f2[j, :])
     return F

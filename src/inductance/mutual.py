@@ -9,7 +9,7 @@ import math
 import numpy as np
 
 from ._numba import njit
-from .filaments import mutual_inductance_fil, mutual_inductance_of_filaments
+from .filaments import mutual_fil, mutual_inductance_of_filaments
 from .utils import section_coil
 
 
@@ -46,7 +46,8 @@ def mutual_rayleigh(r1, z1, dr1, dz1, n1, r2, z2, dr2, dz2, n2):
             [r1, z1 - dz1 / 2, 1],
             [r1 + dr1 / 2, z1, 1],
             [r1, z1 + dz1 / 2, 1],
-        ]
+        ],
+        dtype=np.float64,
     )
     rzn2 = np.array(
         [
@@ -55,23 +56,24 @@ def mutual_rayleigh(r1, z1, dr1, dz1, n1, r2, z2, dr2, dz2, n2):
             [r2, z2 - dz2 / 2, 1],
             [r2 + dr2 / 2, z2, 1],
             [r2, z2 + dz2 / 2, 1],
-        ]
+        ],
+        dtype=np.float64,
     )
     # apply Rayleigh's Quadrature Method
-    m_ray = -mutual_inductance_fil(rzn1[0, :], rzn2[0, :]) * 2
-    m_ray += mutual_inductance_fil(rzn1[1, :], rzn2[0, :])
-    m_ray += mutual_inductance_fil(rzn1[2, :], rzn2[0, :])
-    m_ray += mutual_inductance_fil(rzn1[3, :], rzn2[0, :])
-    m_ray += mutual_inductance_fil(rzn1[4, :], rzn2[0, :])
-    m_ray += mutual_inductance_fil(rzn1[0, :], rzn2[1, :])
-    m_ray += mutual_inductance_fil(rzn1[0, :], rzn2[2, :])
-    m_ray += mutual_inductance_fil(rzn1[0, :], rzn2[3, :])
-    m_ray += mutual_inductance_fil(rzn1[0, :], rzn2[4, :])
+    m_ray = -mutual_fil(rzn1[0, :], rzn2[0, :]) * 2
+    m_ray += mutual_fil(rzn1[1, :], rzn2[0, :])
+    m_ray += mutual_fil(rzn1[2, :], rzn2[0, :])
+    m_ray += mutual_fil(rzn1[3, :], rzn2[0, :])
+    m_ray += mutual_fil(rzn1[4, :], rzn2[0, :])
+    m_ray += mutual_fil(rzn1[0, :], rzn2[1, :])
+    m_ray += mutual_fil(rzn1[0, :], rzn2[2, :])
+    m_ray += mutual_fil(rzn1[0, :], rzn2[3, :])
+    m_ray += mutual_fil(rzn1[0, :], rzn2[4, :])
     return n1 * n2 * m_ray / 6
 
 
 @njit
-def lyle_equivalent_filaments(r, z, dr, dz, nt, fils):
+def lyle_equivalent_filaments(r, z, dr, dz, nt):
     """Compute the equivalent filament locations for Lyle's method.
 
     Using Lyle's Method of Equivalent Filaments.
@@ -90,8 +92,19 @@ def lyle_equivalent_filaments(r, z, dr, dz, nt, fils):
         dr (float): radial width of coil
         dz (float): height of coil
         nt (float): number of turns in coil
-        fils (numpy.ndarray): array of filaments 2 x (r, z, n)
+
+    Returns:
+        (numpy.ndarray): array of filaments (1,2) x (r, z, n)
     """
+    if dr == dz:
+        fils = np.zeros((1, 3), dtype=np.float64)
+        req = r * (1 + dz**2 / (24 * r**2))
+        fils[:, 0] = req
+        fils[:, 1] = z
+        fils[:, 2] = float(nt)
+        return fils
+
+    fils = np.zeros((2, 3), dtype=np.float64)
     if dr < dz:
         req = r * (1 + dr**2 / (24 * r**2))
         beta = math.sqrt((dz**2 - dr**2) / 12)
@@ -102,11 +115,8 @@ def lyle_equivalent_filaments(r, z, dr, dz, nt, fils):
         delta = math.sqrt((dr**2 - dz**2) / 12)
         fils[:, 0] = req - delta, req + delta
         fils[:, 1] = z
-    else:
-        req = r * (1 + dz**2 / (24 * r**2))
-        fils[:, 0] = req
-        fils[:, 1] = z
     fils[:, 2] = 0.5 * nt
+    return fils
 
 
 @njit
@@ -138,21 +148,18 @@ def mutual_lyles_method(r1, z1, dr1, dz1, nt1, r2, z2, dr2, dz2, nt2):
     Returns:
         float: mutual inductance of the two coils
     """
-    fils1 = np.zeros(2, 3)
-    fils2 = np.zeros(2, 3)
-
-    lyle_equivalent_filaments(r1, z1, dr1, dz1, nt1, fils1)
-    lyle_equivalent_filaments(r2, z2, dr2, dz2, nt2, fils1)
+    fils1 = lyle_equivalent_filaments(r1, z1, dr1, dz1, nt1)
+    fils2 = lyle_equivalent_filaments(r2, z2, dr2, dz2, nt2)
     return mutual_inductance_of_filaments(fils1, fils2)
 
 
 @njit
 def lyle_equivalent_subcoil_filaments(subcoils):
     """Compute the equivalent filament locations for set of subcoils."""
-    fils = np.zeros((subcoils.shape[0], 2, 3))
+    fils = []
     for i in range(subcoils.shape[0]):
-        lyle_equivalent_filaments(*subcoils[i, :], fils[i, :, :])
-    return fils
+        fils.append(lyle_equivalent_filaments(*subcoils[i, :]))
+    return np.vstack(fils)
 
 
 def mutual_sectioning_lyle(
@@ -185,7 +192,7 @@ def mutual_sectioning_lyle(
     subs_1 = section_coil(r1, z1, dr1, dz1, nt1, nr1, nz1)
     subs_2 = section_coil(r2, z2, dr2, dz2, nt2, nr2, nz2)
 
-    fils_1 = lyle_equivalent_subcoil_filaments(subs_1).reshape(-1, 3)
-    fils_2 = lyle_equivalent_subcoil_filaments(subs_2).reshape(-1, 3)
+    fils_1 = lyle_equivalent_subcoil_filaments(subs_1)
+    fils_2 = lyle_equivalent_subcoil_filaments(subs_2)
 
     return mutual_inductance_of_filaments(fils_1, fils_2)

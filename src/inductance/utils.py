@@ -18,18 +18,21 @@ def _lyle_terms(b, c):
         c (float): radial width of coil
 
     Returns:
-        : _description_
+        tuple(float): Lyle terms: d, u, v, w, p, phi, GMD
     """
     # the basic formulae and gives inaccurate results when b/c ~ 1e6 or 1e-6
     # phi should approach 1.5 and GMD should approach (b+c)*exp(-1.5)
     # so special case the ends, and for small and large b/c
     # will try to use limit functions and series expansions
-    boc2 = (b / c) ** 2
+
+    # div by zero cases
     if b == 0:
-        u, v, w, p = 0, 1, 0, 1
+        return c, 0.0, 1.0, 0.0, 1.0, 1.5, c * math.exp(-1.5)
     elif c == 0:
-        u, v, w, p = 1, 0, 1, 0
-    elif boc2 < 1e-8:
+        return b, 1.0, 0.0, 1.0, 0.0, 1.5, b * math.exp(-1.5)
+
+    boc2 = (b / c) ** 2  # test for extreme cases
+    if boc2 < 1e-8:
         u = -boc2 * math.log(boc2) + boc2**2 - boc2**3 / 2
         v = 1 - boc2 / 2 + boc2**2 / 3
         w = math.pi / 2 * (b / c) - boc2 + boc2**2 / 3
@@ -49,11 +52,11 @@ def _lyle_terms(b, c):
     d = np.sqrt(b**2 + c**2)  # diagnonal length
     phi = (u + v + 25) / 12 - 2 * (w + p) / 3
     GMD = d * np.exp(-phi)  # geometric mean radius of section GMD
-
     return d, u, v, w, p, phi, GMD
 
 
-def rectangle_GMD(dr, dz):
+@njit
+def gmd_rectangle(dr, dz):
     """Geometric mean radius of a rectangle.
 
     Args:
@@ -61,9 +64,34 @@ def rectangle_GMD(dr, dz):
         dz (float): height of rectangle
 
     Returns:
-        float: GMD of rectangle
+        float: g.m.d of rectangle
     """
     return _lyle_terms(dz, dr)[-1]
+
+
+@njit
+def gmd_hollow_circle(r_o, r_i):
+    """Geometric mean radius of a hollow circle (annulus) from itself.
+
+    From:
+    Rosa, E.B and Grover, F.W. "Formulas and Tables for the Calculation
+    of Mutual and Self-Inductance" Bulletin of the Bureau of Standards,
+    (1916),
+
+    Eq 129 on pg. 168
+
+    Args:
+        r_o (float): outer radius of circle
+        r_i (float): inner radius of circle
+
+    Returns:
+        float: g.m.d. of hollow circle
+    """
+    log_R = math.log(r_o) + (
+        -((r_i) ** 4) / (r_o**2 - r_i**2) ** 2 * math.log(r_o / r_i)
+        + 0.25 * (3 * r_i**2 - r_o**2) / (r_o**2 - r_i**2)
+    )
+    return np.exp(log_R)
 
 
 def section_coil(r, z, dr, dz, nt, nr, nz, theta=0):

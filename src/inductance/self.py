@@ -25,9 +25,9 @@ import numpy as np
 
 from ._numba import njit, prange
 from .elliptics import ellipke
-from .filaments import mutual_inductance_fil
+from .filaments import mutual_fil
 from .mutual import lyle_equivalent_subcoil_filaments, mutual_lyles_method
-from .utils import _lyle_terms, section_coil
+from .utils import _lyle_terms, gmd_hollow_circle, section_coil
 
 MU0 = 4e-7 * math.pi  # permeability of free space
 
@@ -48,7 +48,7 @@ def L_maxwell(r, dr, dz, n):
     a = float(r)
     b = float(dz)
     c = float(dr)
-    d, u, v, w, wp, phi, GMD = _lyle_terms(b, c)
+    _, _, _, _, _, _, GMD = _lyle_terms(b, c)
     L = MU0 * (n**2) * a * (math.log(8 * a / GMD) - 2)
     return L
 
@@ -70,18 +70,20 @@ def L_round(r, a, n):
 
 
 @njit
-def L_hollow_round(r, a, n):
+def L_hollow_round(R, r_o, r_i, n):
     """Self inductance of a round conductor coil with skin current.
 
     Args:
-        r (float): coil centerline radius
-        a (float): coil conductor radius
+        R (float): coil centerline radius
+        r_o (float): conductor outer radius
+        r_i (float): conductor inner radius
         n (int): number of turns
 
     Returns:
         float: coil self inductance in Henrys
     """
-    L = MU0 * (n**2) * r * (math.log(8 * r / a) - 2)
+    GMD = gmd_hollow_circle(r_o, r_i)
+    L = MU0 * (n**2) * R * (math.log(8 * R / GMD) - 2)
     return L
 
 
@@ -101,7 +103,7 @@ def L_lyle4(r, dr, dz, n):
     a = float(r)
     b = float(dz)
     c = float(dr)
-    d, u, v, w, wp, phi, GMD = _lyle_terms(b, c)
+    d, u, v, w, _, phi, GMD = _lyle_terms(b, c)
     p2 = 1 / (2**5 * 3 * d**2) * (3 * b**2 + c**2)
     q2 = (
         1
@@ -137,7 +139,6 @@ def L_lyle4(r, dr, dz, n):
     ML = np.log(8 * a / GMD)
 
     # equation #3
-
     eq3 = (
         MU0
         * (n**2)
@@ -172,7 +173,7 @@ def L_lyle4_eq4(r, dr, dz, n):
     a = float(r)
     b = float(dz)
     c = float(dr)
-    d, u, v, w, wp, phi, GMD = _lyle_terms(b, c)
+    d, u, v, w, _, phi, GMD = _lyle_terms(b, c)
     p2 = 1 / (2**5 * 3 * d**2) * (3 * b**2 + c**2)
     q2 = (
         1
@@ -246,23 +247,24 @@ def L_lyle6(r, dr, dz, n):
         + (1 + u + v - 8 * (w + ww)) / 12.0  # 0th order in d/a
         + (
             da2
+            / 5760.0  # 2nd order
             * (
                 cd2 * (221 + 60 * ML - 6 * v)
                 + 3 * bd2 * (69 + 60 * ML + 10 * u - 64 * w)
             )
         )
-        / 5760.0  # 2nd order
         + (
             da2**2
+            / 2.58048e7  # 4th order
             * (
                 2 * cd2**2 * (5721 + 3080 * ML - 345 * v)
                 + 5 * bd2 * cd2 * (407 + 5880 * ML + 6720 * u - 14336 * w)
                 - 10 * bd2**2 * (3659 + 2520 * ML + 805 * u - 6144 * w)
             )
         )
-        / 2.58048e7  # 4th order
         + (
             da2**3
+            / 1.73408256e10  # 6th order
             * (
                 3 * cd2**3 * (4308631 + 86520 * ML - 10052 * v)
                 - 14
@@ -273,10 +275,8 @@ def L_lyle6(r, dr, dz, n):
                 + 42 * bd2 * cd2**2 * (-8329 + 46200 * ML + 134400 * u - 172032 * w)
             )
         )
-        / 1.73408256e10  # 6th order
     )
     L = MU0 * (n**2) * a * f
-    # print("Lyle6 r: %.4g, dr: %.4g, dz: %4g, n: %d, L: %.8g"%(a,c,b,n,L))
     return L
 
 
@@ -576,11 +576,11 @@ def self_inductance_by_filaments(f, conductor="round", a=0.01, dr=0.01, dz=0.01)
     for i in prange(f.shape[0]):
         for j in range(f.shape[0]):
             if i != j:
-                L += mutual_inductance_fil(f[i, :], f[j, :])
+                L += mutual_fil(f[i, :], f[j, :])
         if conductor == "round":
             L += L_round(f[i, 0], a, f[i, 2])
         elif conductor == "hollow_round":
-            L += L_hollow_round(f[i, 0], a, f[i, 2])
+            L += L_hollow_round(f[i, 0], a, a - dr, f[i, 2])
         elif conductor == "rect":
             L += L_lyle6(f[i, 0], dr, dz, f[i, 2])
     return L
